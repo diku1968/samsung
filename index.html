@@ -20,44 +20,64 @@
 
     <script>
         const status = document.getElementById('status');
-        const video = document.getElementById('webcam');
-        const canvas = document.getElementById('art-canvas');
-        const styleImg = document.getElementById('style-img');
+const video = document.getElementById('webcam');
+const canvas = document.getElementById('art-canvas');
+const styleImg = document.getElementById('style-img');
 
-        async function start() {
-            try {
-                status.innerText = "STEP 1: SETTING BACKEND...";
-                // 'cpu' is slower but will NOT crash. Once this works, we change to 'webgl'
-                await tf.setBackend('cpu'); 
-                
-                status.innerText = "STEP 2: LOADING ART MODEL (40MB)...";
-                const model = new mi.ArbitraryStyleTransferNetwork();
-                await model.initialize();
+async function start() {
+    try {
+        status.innerText = "STEP 1: UNLEASHING GPU...";
+        await tf.setBackend('webgl'); 
+        await tf.ready();
+        
+        status.innerText = "STEP 2: LOADING ART BRAIN...";
+        const model = new mi.ArbitraryStyleTransferNetwork();
+        await model.initialize();
 
-                status.innerText = "STEP 3: ACCESSING CAMERA...";
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "environment" } 
-                });
-                video.srcObject = stream;
+        status.innerText = "STEP 3: OPENING CAMERA...";
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                facingMode: "environment",
+                width: { ideal: 480 }, 
+                height: { ideal: 480 }
+            } 
+        });
+        video.srcObject = stream;
 
-                status.innerText = "STEP 4: RUNNING NPU ART ENGINE...";
-                
-                async function loop() {
-                    const stylized = await model.stylize(video, styleImg);
-                    await tf.browser.toPixels(stylized, canvas);
-                    stylized.dispose(); // Important: Frees up phone memory
-                    requestAnimationFrame(loop);
-                }
-                loop();
+        // NEW: Wait for the video to actually have data before starting Step 4
+        video.onloadedmetadata = () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            status.innerText = "STEP 4: ART ENGINE ACTIVE";
+            loop(model);
+        };
 
-            } catch (err) {
-                status.style.color = "red";
-                status.innerText = "ERROR: " + err.message;
-                console.error(err);
-            }
-        }
+    } catch (err) {
+        status.style.color = "red";
+        status.innerText = "CRASH: " + err.message;
+        console.error(err);
+    }
+}
 
-        window.onload = start;
+async function loop(model) {
+    // Wrap in a try-catch so one bad frame doesn't stop the whole app
+    try {
+        const result = tf.tidy(() => {
+            return model.stylize(video, styleImg);
+        });
+
+        const stylized = await result;
+        await tf.browser.toPixels(stylized, canvas);
+        stylized.dispose(); 
+    } catch (e) {
+        console.log("Frame skip...");
+    }
+    
+    // S26 Ultra is powerful, 40ms is roughly 25 frames per second
+    setTimeout(() => loop(model), 40); 
+}
+
+window.onload = start;
     </script>
 </body>
 </html>
