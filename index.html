@@ -1,523 +1,104 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AI Motion Scanner - Make Images Come Alive</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        * {
-            box-sizing: border-box;
-            user-select: none;
-        }
-        
-        body {
-            background: #000;
-            color: #0ff;
-            font-family: monospace;
-            margin: 0;
-            padding: 0;
-            overflow-x: hidden;
-        }
-        
-        #status {
-            padding: 12px;
-            font-size: 12px;
-            background: rgba(0,0,0,0.9);
-            border-bottom: 2px solid #0ff;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 100;
-            text-align: center;
-            backdrop-filter: blur(10px);
-            font-weight: bold;
-        }
-        
-        .main-container {
-            margin-top: 50px;
-            padding: 10px;
-        }
-        
-        .viewer {
-            background: #111;
-            border-radius: 10px;
-            overflow: hidden;
-            margin-bottom: 15px;
-            border: 1px solid #0ff;
-            box-shadow: 0 0 20px rgba(0,255,255,0.2);
-        }
-        
-        .viewer-title {
-            background: rgba(0,255,255,0.1);
-            padding: 8px;
-            font-size: 12px;
-            text-align: center;
-            border-bottom: 1px solid #0ff;
-        }
-        
-        video, canvas {
-            width: 100%;
-            height: auto;
-            display: block;
-            background: #000;
-            cursor: pointer;
-        }
-        
-        video {
-            transform: scaleX(-1);
-        }
-        
-        canvas {
-            transform: scaleX(-1);
-        }
-        
-        .controls {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: rgba(0,0,0,0.95);
-            padding: 12px;
-            display: flex;
-            gap: 8px;
-            justify-content: center;
-            flex-wrap: wrap;
-            border-top: 1px solid #0ff;
-            z-index: 100;
-            backdrop-filter: blur(10px);
-        }
-        
-        button {
-            background: linear-gradient(135deg, #0ff, #00f);
-            color: #fff;
-            border: none;
-            padding: 10px 16px;
-            font-family: monospace;
-            font-weight: bold;
-            border-radius: 20px;
-            cursor: pointer;
-            transition: all 0.2s;
-            box-shadow: 0 2px 10px rgba(0,255,255,0.3);
-            font-size: 12px;
-        }
-        
-        button:active {
-            transform: scale(0.95);
-        }
-        
-        .effect-badge {
-            position: fixed;
-            top: 55px;
-            right: 10px;
-            background: rgba(0,0,0,0.85);
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 10px;
-            border-left: 3px solid #0ff;
-            z-index: 100;
-            backdrop-filter: blur(5px);
-            pointer-events: none;
-        }
-        
-        .instruction {
-            text-align: center;
-            font-size: 11px;
-            padding: 8px;
-            background: rgba(0,255,255,0.05);
-            margin: 10px;
-            border-radius: 10px;
-            color: #0fa;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-        
-        .recording {
-            animation: pulse 1s infinite;
-            color: #f00;
-        }
-        
-        @media (min-width: 768px) {
-            .split-view {
-                display: flex;
-                gap: 15px;
-            }
-            .viewer {
-                flex: 1;
-            }
-            button {
-                padding: 12px 20px;
-                font-size: 14px;
-            }
-        }
+        body { margin: 0; background: #000; overflow: hidden; font-family: sans-serif; }
+        canvas { width: 100vw; height: 100vh; object-fit: cover; }
+        #info { position: absolute; top: 10px; width: 100%; text-align: center; color: #0ff; z-index: 10; font-size: 12px; pointer-events: none; }
     </style>
 </head>
 <body>
-    <div id="status">🎬 AI MOTION SCANNER - Ready to bring images to life!</div>
-    <div class="effect-badge" id="effect-badge">✨ EFFECT: WARP FIELD</div>
-    
-    <div class="main-container">
-        <div class="split-view">
-            <div class="viewer">
-                <div class="viewer-title">📷 SCAN ANY IMAGE</div>
-                <video id="webcam" autoplay playsinline muted></video>
-            </div>
-            
-            <div class="viewer">
-                <div class="viewer-title">✨ AI LIVING ARTWORK (MOVING)</div>
-                <canvas id="art-canvas"></canvas>
-            </div>
-        </div>
-        <div class="instruction">
-            🔥 SCAN ANY IMAGE → WATCH IT MOVE, WARP, TRANSFORM & COME ALIVE! 🔥
-        </div>
-    </div>
-
-    <div class="controls">
-        <button onclick="setMotionEffect('warp')" id="btn-warp">🌀 WARP FIELD</button>
-        <button onclick="setMotionEffect('ripple')" id="btn-ripple">💧 WATER RIPPLE</button>
-        <button onclick="setMotionEffect('morph')" id="btn-morph">🦋 DREAM MORPH</button>
-        <button onclick="setMotionEffect('explode')" id="btn-explode">💥 PIXEL EXPLODE</button>
-        <button onclick="setMotionEffect('fire')" id="btn-fire">🔥 LIVING FIRE</button>
-        <button onclick="toggleMotion()" id="btn-motion">⏸️ FREEZE</button>
-    </div>
+    <div id="info">POINT AT A PICTURE (SEA/SHIP) <br> NPU LIVE MOTION ACTIVE</div>
+    <canvas id="glCanvas"></canvas>
 
     <script>
-        // AI Motion Generator - Makes any scanned image come alive with movement!
-        const video = document.getElementById('webcam');
-        const canvas = document.getElementById('art-canvas');
-        const ctx = canvas.getContext('2d');
-        const statusDiv = document.getElementById('status');
-        const effectBadge = document.getElementById('effect-badge');
-        
-        let currentEffect = 'warp';
-        let isMoving = true;
-        let animationId = null;
-        let time = 0;
-        let lastCapturedFrame = null;
-        let morphProgress = 0;
-        let morphTarget = null;
-        
-        // Advanced motion effects that make static images come alive
-        const motionEffects = {
-            warp: {
-                name: 'WARP FIELD',
-                emoji: '🌀',
-                process: (imageData, time) => {
-                    const data = imageData.data;
-                    const width = imageData.width;
-                    const height = imageData.height;
-                    const output = new ImageData(width, height);
-                    const outData = output.data;
-                    
-                    // Create swirling warp effect (image bends and moves)
-                    for (let y = 0; y < height; y++) {
-                        for (let x = 0; x < width; x++) {
-                            // Calculate warped coordinates that change over time
-                            const angle = Math.atan2(y - height/2, x - width/2);
-                            const radius = Math.sqrt((x - width/2)**2 + (y - height/2)**2);
-                            const warpX = x + Math.sin(angle * 5 + time) * 15 * (1 - radius / Math.max(width, height));
-                            const warpY = y + Math.cos(angle * 3 + time * 1.5) * 15 * (1 - radius / Math.max(width, height));
-                            
-                            const srcX = Math.min(width-1, Math.max(0, Math.floor(warpX)));
-                            const srcY = Math.min(height-1, Math.max(0, Math.floor(warpY)));
-                            
-                            const srcIdx = (srcY * width + srcX) * 4;
-                            const dstIdx = (y * width + x) * 4;
-                            
-                            outData[dstIdx] = data[srcIdx];
-                            outData[dstIdx+1] = data[srcIdx+1];
-                            outData[dstIdx+2] = data[srcIdx+2];
-                            outData[dstIdx+3] = 255;
-                        }
-                    }
-                    return output;
-                }
-            },
-            
-            ripple: {
-                name: 'WATER RIPPLE',
-                emoji: '💧',
-                process: (imageData, time) => {
-                    const data = imageData.data;
-                    const width = imageData.width;
-                    const height = imageData.height;
-                    const output = new ImageData(width, height);
-                    const outData = output.data;
-                    
-                    // Create water ripple distortion
-                    for (let y = 0; y < height; y++) {
-                        for (let x = 0; x < width; x++) {
-                            const rippleX = x + Math.sin(y * 0.05 + time * 5) * 8;
-                            const rippleY = y + Math.sin(x * 0.05 + time * 4) * 8;
-                            
-                            const srcX = Math.min(width-1, Math.max(0, Math.floor(rippleX)));
-                            const srcY = Math.min(height-1, Math.max(0, Math.floor(rippleY)));
-                            
-                            const srcIdx = (srcY * width + srcX) * 4;
-                            const dstIdx = (y * width + x) * 4;
-                            
-                            outData[dstIdx] = data[srcIdx];
-                            outData[dstIdx+1] = data[srcIdx+1];
-                            outData[dstIdx+2] = data[srcIdx+2];
-                            outData[dstIdx+3] = 255;
-                        }
-                    }
-                    return output;
-                }
-            },
-            
-            morph: {
-                name: 'DREAM MORPH',
-                emoji: '🦋',
-                process: (imageData, time) => {
-                    const data = imageData.data;
-                    const width = imageData.width;
-                    const height = imageData.height;
-                    const output = new ImageData(width, height);
-                    const outData = output.data;
-                    
-                    // Creates morphing, flowing colors that continuously shift
-                    for (let i = 0; i < data.length; i += 4) {
-                        const r = data[i];
-                        const g = data[i+1];
-                        const b = data[i+2];
-                        
-                        // Colors drift and morph over time
-                        const drift = Math.sin(time + i * 0.0001) * 30;
-                        const drift2 = Math.cos(time * 0.7 + i * 0.0002) * 25;
-                        
-                        outData[i] = Math.min(255, Math.max(0, r + drift + drift2));
-                        outData[i+1] = Math.min(255, Math.max(0, g + drift2 - drift * 0.5));
-                        outData[i+2] = Math.min(255, Math.max(0, b + Math.sin(time * 1.3) * 40));
-                        outData[i+3] = 255;
-                    }
-                    return output;
-                }
-            },
-            
-            explode: {
-                name: 'PIXEL EXPLODE',
-                emoji: '💥',
-                process: (imageData, time) => {
-                    const data = imageData.data;
-                    const width = imageData.width;
-                    const height = imageData.height;
-                    const output = new ImageData(width, height);
-                    const outData = output.data;
-                    
-                    // Pixels scatter and regroup like an explosion
-                    const intensity = (Math.sin(time) + 1) / 2;
-                    
-                    for (let y = 0; y < height; y++) {
-                        for (let x = 0; x < width; x++) {
-                            const angle = Math.atan2(y - height/2, x - width/2);
-                            const radius = Math.sqrt((x - width/2)**2 + (y - height/2)**2);
-                            const offset = Math.sin(time * 3) * 20 * (1 - intensity);
-                            
-                            const srcX = x + Math.cos(angle) * offset;
-                            const srcY = y + Math.sin(angle) * offset;
-                            
-                            const srcX_clamped = Math.min(width-1, Math.max(0, Math.floor(srcX)));
-                            const srcY_clamped = Math.min(height-1, Math.max(0, Math.floor(srcY)));
-                            
-                            const srcIdx = (srcY_clamped * width + srcX_clamped) * 4;
-                            const dstIdx = (y * width + x) * 4;
-                            
-                            outData[dstIdx] = data[srcIdx];
-                            outData[dstIdx+1] = data[srcIdx+1];
-                            outData[dstIdx+2] = data[srcIdx+2];
-                            outData[dstIdx+3] = 255;
-                        }
-                    }
-                    return output;
-                }
-            },
-            
-            fire: {
-                name: 'LIVING FIRE',
-                emoji: '🔥',
-                process: (imageData, time) => {
-                    const data = imageData.data;
-                    const width = imageData.width;
-                    const height = imageData.height;
-                    const output = new ImageData(width, height);
-                    const outData = output.data;
-                    
-                    // Creates fire-like motion and color shifts
-                    for (let i = 0; i < data.length; i += 4) {
-                        const r = data[i];
-                        const g = data[i+1];
-                        const b = data[i+2];
-                        
-                        const flicker = Math.random() * 40;
-                        const heat = Math.sin(time * 10 + i * 0.0005) * 50;
-                        
-                        // Warm color dominance with movement
-                        outData[i] = Math.min(255, r * 1.2 + flicker + heat);
-                        outData[i+1] = Math.min(255, g * 0.7 + flicker * 0.6);
-                        outData[i+2] = Math.min(255, b * 0.3);
-                        
-                        // Fire wave distortion
-                        const waveY = Math.floor(Math.sin(time * 8 + (i/4) * 0.01) * 10);
-                        outData[i+3] = 255;
-                    }
-                    return output;
-                }
+        const canvas = document.getElementById('glCanvas');
+        const gl = canvas.getContext('webgl');
+
+        let video = document.createElement('video');
+        video.autoplay = true;
+        video.playsinline = true;
+
+        // 1. Vertex Shader (Positioning)
+        const vs = `
+            attribute vec2 position;
+            varying vec2 vUv;
+            void main() {
+                vUv = position * 0.5 + 0.5;
+                vUv.y = 1.0 - vUv.y;
+                gl_Position = vec4(position, 0.0, 1.0);
             }
-        };
-        
-        function setMotionEffect(effect) {
-            currentEffect = effect;
-            const effectData = motionEffects[effect];
-            effectBadge.innerHTML = `✨ EFFECT: ${effectData.name} ${effectData.emoji}`;
-            statusDiv.innerHTML = `🎬 ${effectData.name} ACTIVATED - Image is now ${effectData.name.toLowerCase()}!`;
-            
-            setTimeout(() => {
-                statusDiv.innerHTML = `📸 SCAN ANY IMAGE → WATCH IT COME ALIVE!`;
-            }, 2000);
-            
-            // Reset morph progress for smooth transition
-            morphProgress = 0;
-            
-            if (window.navigator && window.navigator.vibrate) {
-                window.navigator.vibrate(50);
+        `;
+
+        // 2. Fragment Shader (The "Motion" Math)
+        const fs = `
+            precision highp float;
+            varying vec2 vUv;
+            uniform sampler2D u_texture;
+            uniform float u_time;
+
+            void main() {
+                vec2 uv = vUv;
+                
+                // This math creates the "Sea/Wave" motion
+                // It shifts pixels based on a Sine wave
+                float wave = sin(uv.y * 10.0 + u_time * 2.0) * 0.005;
+                float sway = cos(uv.x * 5.0 + u_time * 1.5) * 0.003;
+                
+                vec4 color = texture2D(u_texture, uv + vec2(wave, sway));
+                gl_FragColor = color;
             }
+        `;
+
+        // Standard WebGL Setup for S26 Ultra
+        function createShader(gl, type, source) {
+            const s = gl.createShader(type);
+            gl.shaderSource(s, source);
+            gl.compileShader(s);
+            return s;
         }
-        
-        function toggleMotion() {
-            isMoving = !isMoving;
-            const btn = document.getElementById('btn-motion');
-            if (isMoving) {
-                btn.innerHTML = '⏸️ FREEZE';
-                statusDiv.innerHTML = '✨ MOTION RESUMED - Image moving again!';
-            } else {
-                btn.innerHTML = '▶️ UNFREEZE';
-                statusDiv.innerHTML = '❄️ FROZEN - Press UNFREEZE to bring back motion';
-            }
-            
-            if (window.navigator && window.navigator.vibrate) {
-                window.navigator.vibrate(30);
-            }
-        }
-        
-        function applyMotionEffect(sourceImageData) {
-            if (!isMoving) return sourceImageData;
-            
-            const effect = motionEffects[currentEffect];
-            if (!effect) return sourceImageData;
-            
-            try {
-                return effect.process(sourceImageData, time);
-            } catch(e) {
-                return sourceImageData;
-            }
-        }
-        
-        // Add particle effects for extra magic
-        function addParticleMagic(ctx, width, height) {
-            if (!isMoving || Math.random() > 0.95) return;
-            
-            const imageData = ctx.getImageData(0, 0, width, height);
-            const data = imageData.data;
-            
-            // Add floating particles that move across the image
-            for (let i = 0; i < 50; i++) {
-                const x = Math.floor(Math.random() * width);
-                const y = Math.floor(Math.random() * height);
-                const idx = (y * width + x) * 4;
-                
-                const timeFactor = Math.sin(time * 5 + x * 0.02) * 30;
-                
-                data[idx] = Math.min(255, data[idx] + 40 + timeFactor);
-                data[idx+1] = Math.min(255, data[idx+1] + 30);
-                
-                if (currentEffect === 'fire') {
-                    data[idx+2] = Math.min(255, data[idx+2] + 60);
-                }
-            }
-            
-            ctx.putImageData(imageData, 0, 0);
-        }
-        
-        function processFrame() {
-            if (video.readyState !== 4 || video.videoWidth === 0) {
-                animationId = requestAnimationFrame(processFrame);
-                return;
-            }
-            
-            // Match canvas size
-            if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-            }
-            
-            try {
-                // Capture current camera frame (the static image you're scanning)
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                
-                // Get the image data
-                let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                
-                // Apply motion effect to make it come alive!
-                imageData = applyMotionEffect(imageData);
-                
-                // Put back the moving artwork
-                ctx.putImageData(imageData, 0, 0);
-                
-                // Add magical particles
-                addParticleMagic(ctx, canvas.width, canvas.height);
-                
-                // Update time for continuous animation
-                time += 0.05;
-                
-            } catch(e) {
-                // Silent fail for frame skips
-            }
-            
-            animationId = requestAnimationFrame(processFrame);
-        }
-        
-        async function initCamera() {
-            try {
-                statusDiv.innerHTML = "🎥 CAMERA INITIALIZING - Get ready to bring images to life!";
-                
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: "environment",
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 }
-                    }
-                });
-                
-                video.srcObject = stream;
-                
-                return new Promise((resolve) => {
-                    video.onloadeddata = () => {
-                        statusDiv.innerHTML = "✅ SCAN ANY IMAGE - Watch it MOVE & COME ALIVE!";
-                        canvas.width = video.videoWidth;
-                        canvas.height = video.videoHeight;
-                        resolve();
-                    };
-                });
-                
-            } catch(err) {
-                statusDiv.innerHTML = "❌ Camera error: " + err.message;
-                statusDiv.style.color = "#f00";
-                return false;
-            }
-        }
-        
+
+        const program = gl.createProgram();
+        gl.attachShader(program, createShader(gl, gl.VERTEX_SHADER, vs));
+        gl.attachShader(program, createShader(gl, gl.FRAGMENT_SHADER, fs));
+        gl.linkProgram(program);
+        gl.useProgram(program);
+
+        const buffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]), gl.STATIC_DRAW);
+
+        const pos = gl.getAttribLocation(program, "position");
+        gl.enableVertexAttribArray(pos);
+        gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
+
+        const texture = gl.createTexture();
+        const uTime = gl.getUniformLocation(program, "u_time");
+
         async function start() {
-            const cameraReady = await initCamera();
-            if (cameraReady !== false) {
-                processFrame();
-            }
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            video.srcObject = stream;
+            video.play();
+            requestAnimationFrame(render);
         }
-        
-        // Start the AI Motion Scanner
+
+        function render(time) {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            gl.viewport(0, 0, canvas.width, canvas.height);
+
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+
+            gl.uniform1f(uTime, time * 0.001);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+            requestAnimationFrame(render);
+        }
+
         start();
     </script>
 </body>
