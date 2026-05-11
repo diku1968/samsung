@@ -1,99 +1,63 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>S26 Ultra NPU Art Scanner</title>
-    <!-- Load TensorFlow.js and Magenta -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@magenta/image@0.2.1/dist/magentaimg.js"></script>
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@magenta/image@0.2.1"></script>
     <style>
-        body { font-family: sans-serif; background: #121212; color: white; text-align: center; margin: 0; overflow-x: hidden; }
-        video, canvas { width: 90%; max-width: 500px; border-radius: 15px; margin-top: 10px; border: 2px solid #333; }
-        .controls { padding: 20px; }
-        button { background: #007bff; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 16px; cursor: pointer; }
-        .style-thumb { width: 60px; height: 60px; border-radius: 50%; border: 2px solid white; margin: 5px; cursor: pointer; object-fit: cover; }
-        .loading { color: #ffcc00; font-weight: bold; }
+        body { background: #000; color: #0ff; font-family: monospace; text-align: center; }
+        #status { padding: 20px; font-size: 14px; border-bottom: 1px solid #0ff; }
+        video, canvas { width: 95%; max-width: 400px; margin-top: 10px; border: 1px solid #0ff; }
     </style>
 </head>
 <body>
+    <div id="status">INITIATING SYSTEM...</div>
+    
+    <video id="webcam" autoplay playsinline muted style="display:none;"></video>
+    <canvas id="art-canvas"></canvas>
 
-    <h2>AI NPU Art Studio</h2>
-    <p id="status" class="loading">Loading AI Models... Please wait.</p>
-
-    <!-- Hidden Style Source (You can change this URL to any art style) -->
-    <img id="style-img" src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg/300px-Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg" style="display:none;" crossorigin="anonymous">
-
-    <div id="app" style="display:none;">
-        <video id="webcam" autoplay playsinline muted></video>
-        <canvas id="art-canvas"></canvas>
-        
-        <div class="controls">
-            <p>Scanning Live Feed & Applying Style</p>
-            <button onclick="toggleCamera()">Flip Camera</button>
-        </div>
-    </div>
+    <img id="style-img" src="https://images.metmuseum.org/CRDImages/ep/mobile-large/DP-13139-001.jpg" style="display:none;" crossorigin="anonymous">
 
     <script>
-        let model;
+        const status = document.getElementById('status');
         const video = document.getElementById('webcam');
         const canvas = document.getElementById('art-canvas');
         const styleImg = document.getElementById('style-img');
-        const status = document.getElementById('status');
-        const app = document.getElementById('app');
 
-        async function init() {
-            // Initialize the Style Transfer Model
-            model = new mi.ArbitraryStyleTransferNetwork();
-            await model.initialize();
-            
-            status.innerText = "Model Loaded! Starting Camera...";
-            
-            // Setup Webcam
+        async function start() {
             try {
+                status.innerText = "STEP 1: SETTING BACKEND...";
+                // 'cpu' is slower but will NOT crash. Once this works, we change to 'webgl'
+                await tf.setBackend('cpu'); 
+                
+                status.innerText = "STEP 2: LOADING ART MODEL (40MB)...";
+                const model = new mi.ArbitraryStyleTransferNetwork();
+                await model.initialize();
+
+                status.innerText = "STEP 3: ACCESSING CAMERA...";
                 const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "environment" }, 
-                    audio: false 
+                    video: { facingMode: "environment" } 
                 });
                 video.srcObject = stream;
-                status.style.display = "none";
-                app.style.display = "block";
+
+                status.innerText = "STEP 4: RUNNING NPU ART ENGINE...";
                 
-                // Start the AI Processing Loop
-                renderArt();
+                async function loop() {
+                    const stylized = await model.stylize(video, styleImg);
+                    await tf.browser.toPixels(stylized, canvas);
+                    stylized.dispose(); // Important: Frees up phone memory
+                    requestAnimationFrame(loop);
+                }
+                loop();
+
             } catch (err) {
-                status.innerText = "Error accessing camera: " + err;
+                status.style.color = "red";
+                status.innerText = "ERROR: " + err.message;
+                console.error(err);
             }
         }
 
-        async function renderArt() {
-            // Every frame, use the NPU to transform the image
-            // We use a small size (256) for the internal math to keep it fast
-            try {
-                await model.stylize(video, styleImg).then((stylized) => {
-                    const ctx = canvas.getContext('2d');
-                    // Draw the result onto our visible canvas
-                    tf.browser.toPixels(stylized, canvas);
-                });
-            } catch (e) {
-                console.error(e);
-            }
-            
-            // Loop the function
-            requestAnimationFrame(renderArt);
-        }
-
-        function toggleCamera() {
-            // Logic to switch between front and back camera
-            const currMode = video.srcObject.getVideoTracks()[0].getSettings().facingMode;
-            const newMode = currMode === "user" ? "environment" : "user";
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: newMode } })
-                .then(stream => video.srcObject = stream);
-        }
-
-        // Start everything
-        init();
+        window.onload = start;
     </script>
 </body>
 </html>
