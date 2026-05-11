@@ -5,79 +5,72 @@
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0"></script>
     <script src="https://cdn.jsdelivr.net/npm/@magenta/image@0.2.1"></script>
     <style>
-        body { background: #000; color: #0ff; font-family: monospace; text-align: center; }
-        #status { padding: 20px; font-size: 14px; border-bottom: 1px solid #0ff; }
-        video, canvas { width: 95%; max-width: 400px; margin-top: 10px; border: 1px solid #0ff; }
+        body { background: #000; color: #0ff; font-family: monospace; text-align: center; margin: 0; }
+        #status { padding: 15px; font-size: 12px; border-bottom: 1px solid #0ff; background: #111; }
+        video { width: 45%; border: 1px solid #555; margin-top: 10px; } /* Small preview to check camera */
+        canvas { width: 90%; max-width: 500px; border: 2px solid #0ff; margin-top: 10px; display: block; margin-left: auto; margin-right: auto; }
     </style>
 </head>
 <body>
-    <div id="status">INITIATING SYSTEM...</div>
+    <div id="status">SYSTEM STARTING...</div>
     
-    <video id="webcam" autoplay playsinline muted style="display:none;"></video>
+    <p style="font-size: 10px;">RAW CAMERA PREVIEW:</p>
+    <video id="webcam" autoplay playsinline muted></video>
+    
+    <p style="font-size: 10px;">AI ART OUTPUT:</p>
     <canvas id="art-canvas"></canvas>
 
     <img id="style-img" src="56463.jpg" style="display:none;" crossorigin="anonymous">
 
     <script>
         const status = document.getElementById('status');
-const video = document.getElementById('webcam');
-const canvas = document.getElementById('art-canvas');
-const styleImg = document.getElementById('style-img');
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('art-canvas');
+        const styleImg = document.getElementById('style-img');
 
-async function start() {
-    try {
-        status.innerText = "STEP 1: UNLEASHING GPU...";
-        await tf.setBackend('webgl'); 
-        await tf.ready();
-        
-        status.innerText = "STEP 2: LOADING ART BRAIN...";
-        const model = new mi.ArbitraryStyleTransferNetwork();
-        await model.initialize();
+        async function start() {
+            try {
+                status.innerText = "1. ENABLING GPU...";
+                await tf.setBackend('webgl');
+                await tf.ready();
+                
+                status.innerText = "2. LOADING AI MODEL...";
+                const model = new mi.ArbitraryStyleTransferNetwork();
+                await model.initialize();
 
-        status.innerText = "STEP 3: OPENING CAMERA...";
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { 
-                facingMode: "environment",
-                width: { ideal: 480 }, 
-                height: { ideal: 480 }
-            } 
-        });
-        video.srcObject = stream;
+                status.innerText = "3. REQUESTING CAMERA...";
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "environment" } 
+                });
+                video.srcObject = stream;
 
-        // NEW: Wait for the video to actually have data before starting Step 4
-        video.onloadedmetadata = () => {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            status.innerText = "STEP 4: ART ENGINE ACTIVE";
-            loop(model);
-        };
+                video.onloadeddata = () => {
+                    status.innerText = "4. ENGINE RUNNING - LOOK BELOW";
+                    // Set canvas size to match video pixels
+                    canvas.width = video.videoWidth || 480;
+                    canvas.height = video.videoHeight || 480;
+                    loop(model);
+                };
 
-    } catch (err) {
-        status.style.color = "red";
-        status.innerText = "CRASH: " + err.message;
-        console.error(err);
-    }
-}
+            } catch (err) {
+                status.style.color = "red";
+                status.innerText = "ERROR: " + err.message;
+            }
+        }
 
-async function loop(model) {
-    // Wrap in a try-catch so one bad frame doesn't stop the whole app
-    try {
-        const result = tf.tidy(() => {
-            return model.stylize(video, styleImg);
-        });
+        async function loop(model) {
+            try {
+                // The actual AI math happens here
+                const stylized = await model.stylize(video, styleImg);
+                await tf.browser.toPixels(stylized, canvas);
+                stylized.dispose(); 
+            } catch (e) {
+                console.log("Processing...");
+            }
+            requestAnimationFrame(() => loop(model));
+        }
 
-        const stylized = await result;
-        await tf.browser.toPixels(stylized, canvas);
-        stylized.dispose(); 
-    } catch (e) {
-        console.log("Frame skip...");
-    }
-    
-    // S26 Ultra is powerful, 40ms is roughly 25 frames per second
-    setTimeout(() => loop(model), 40); 
-}
-
-window.onload = start;
+        window.onload = start;
     </script>
 </body>
 </html>
