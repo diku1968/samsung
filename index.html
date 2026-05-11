@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AI Art Scanner - Turn Anything into Art</title>
+    <title>AI Motion Scanner - Make Images Come Alive</title>
     <style>
         * {
             box-sizing: border-box;
@@ -30,6 +30,7 @@
             z-index: 100;
             text-align: center;
             backdrop-filter: blur(10px);
+            font-weight: bold;
         }
         
         .main-container {
@@ -43,6 +44,7 @@
             overflow: hidden;
             margin-bottom: 15px;
             border: 1px solid #0ff;
+            box-shadow: 0 0 20px rgba(0,255,255,0.2);
         }
         
         .viewer-title {
@@ -58,6 +60,7 @@
             height: auto;
             display: block;
             background: #000;
+            cursor: pointer;
         }
         
         video {
@@ -74,9 +77,9 @@
             left: 0;
             right: 0;
             background: rgba(0,0,0,0.95);
-            padding: 15px;
+            padding: 12px;
             display: flex;
-            gap: 10px;
+            gap: 8px;
             justify-content: center;
             flex-wrap: wrap;
             border-top: 1px solid #0ff;
@@ -88,40 +91,52 @@
             background: linear-gradient(135deg, #0ff, #00f);
             color: #fff;
             border: none;
-            padding: 12px 20px;
+            padding: 10px 16px;
             font-family: monospace;
             font-weight: bold;
-            border-radius: 25px;
+            border-radius: 20px;
             cursor: pointer;
             transition: all 0.2s;
             box-shadow: 0 2px 10px rgba(0,255,255,0.3);
-            font-size: 14px;
+            font-size: 12px;
         }
         
         button:active {
             transform: scale(0.95);
         }
         
-        .art-style-badge {
+        .effect-badge {
             position: fixed;
-            top: 60px;
+            top: 55px;
             right: 10px;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.85);
             padding: 5px 12px;
             border-radius: 20px;
-            font-size: 11px;
+            font-size: 10px;
             border-left: 3px solid #0ff;
             z-index: 100;
             backdrop-filter: blur(5px);
+            pointer-events: none;
         }
         
         .instruction {
             text-align: center;
             font-size: 11px;
-            padding: 10px;
+            padding: 8px;
             background: rgba(0,255,255,0.05);
             margin: 10px;
             border-radius: 10px;
+            color: #0fa;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .recording {
+            animation: pulse 1s infinite;
+            color: #f00;
         }
         
         @media (min-width: 768px) {
@@ -132,287 +147,331 @@
             .viewer {
                 flex: 1;
             }
+            button {
+                padding: 12px 20px;
+                font-size: 14px;
+            }
         }
     </style>
 </head>
 <body>
-    <div id="status">🔍 AI ART SCANNER READY - Point camera at any image</div>
-    <div class="art-style-badge" id="style-badge">🎨 STYLE: VAN GOGH</div>
+    <div id="status">🎬 AI MOTION SCANNER - Ready to bring images to life!</div>
+    <div class="effect-badge" id="effect-badge">✨ EFFECT: WARP FIELD</div>
     
     <div class="main-container">
         <div class="split-view">
             <div class="viewer">
-                <div class="viewer-title">📷 SCAN IMAGE HERE</div>
+                <div class="viewer-title">📷 SCAN ANY IMAGE</div>
                 <video id="webcam" autoplay playsinline muted></video>
             </div>
             
             <div class="viewer">
-                <div class="viewer-title">✨ AI GENERATED ARTWORK</div>
+                <div class="viewer-title">✨ AI LIVING ARTWORK (MOVING)</div>
                 <canvas id="art-canvas"></canvas>
             </div>
         </div>
         <div class="instruction">
-            💡 TIP: Hold any image (photo, painting, magazine) in front of camera → Watch it transform into living artwork!
+            🔥 SCAN ANY IMAGE → WATCH IT MOVE, WARP, TRANSFORM & COME ALIVE! 🔥
         </div>
     </div>
 
     <div class="controls">
-        <button onclick="setArtStyle('vangogh')" id="btn-vg">🌃 VAN GOGH</button>
-        <button onclick="setArtStyle('munch')" id="btn-munch">😱 MUNCH</button>
-        <button onclick="setArtStyle('hokusai')" id="btn-hokusai">🌊 HOKUSAI</button>
-        <button onclick="setArtStyle('picasso')" id="btn-picasso">🎨 PICASSO</button>
-        <button onclick="setArtStyle('monet')" id="btn-monet">🌸 MONET</button>
-        <button onclick="captureArtwork()" id="btn-capture">📸 CAPTURE ARTWORK</button>
+        <button onclick="setMotionEffect('warp')" id="btn-warp">🌀 WARP FIELD</button>
+        <button onclick="setMotionEffect('ripple')" id="btn-ripple">💧 WATER RIPPLE</button>
+        <button onclick="setMotionEffect('morph')" id="btn-morph">🦋 DREAM MORPH</button>
+        <button onclick="setMotionEffect('explode')" id="btn-explode">💥 PIXEL EXPLODE</button>
+        <button onclick="setMotionEffect('fire')" id="btn-fire">🔥 LIVING FIRE</button>
+        <button onclick="toggleMotion()" id="btn-motion">⏸️ FREEZE</button>
     </div>
 
     <script>
-        // AI Art Scanner - Transforms any scanned image into artwork video
+        // AI Motion Generator - Makes any scanned image come alive with movement!
         const video = document.getElementById('webcam');
         const canvas = document.getElementById('art-canvas');
         const ctx = canvas.getContext('2d');
         const statusDiv = document.getElementById('status');
-        const styleBadge = document.getElementById('style-badge');
+        const effectBadge = document.getElementById('effect-badge');
         
-        let currentStyle = 'vangogh';
-        let isProcessing = true;
+        let currentEffect = 'warp';
+        let isMoving = true;
         let animationId = null;
-        let capturedArtworks = [];
+        let time = 0;
+        let lastCapturedFrame = null;
+        let morphProgress = 0;
+        let morphTarget = null;
         
-        // Advanced artistic style transfers
-        const artStyles = {
-            vangogh: {
-                name: 'VAN GOGH',
-                emoji: '🌃',
-                effect: (r, g, b) => {
-                    // Swirling starry night effect
-                    let newR = Math.min(255, r * 0.9 + g * 0.3 + 25);
-                    let newG = Math.min(255, g * 0.7 + b * 0.4);
-                    let newB = Math.min(255, b * 1.2 + 30);
+        // Advanced motion effects that make static images come alive
+        const motionEffects = {
+            warp: {
+                name: 'WARP FIELD',
+                emoji: '🌀',
+                process: (imageData, time) => {
+                    const data = imageData.data;
+                    const width = imageData.width;
+                    const height = imageData.height;
+                    const output = new ImageData(width, height);
+                    const outData = output.data;
                     
-                    // Add swirl texture
-                    if (Math.random() > 0.95) {
-                        newR = Math.min(255, newR + 40);
-                        newG = Math.min(255, newG + 20);
+                    // Create swirling warp effect (image bends and moves)
+                    for (let y = 0; y < height; y++) {
+                        for (let x = 0; x < width; x++) {
+                            // Calculate warped coordinates that change over time
+                            const angle = Math.atan2(y - height/2, x - width/2);
+                            const radius = Math.sqrt((x - width/2)**2 + (y - height/2)**2);
+                            const warpX = x + Math.sin(angle * 5 + time) * 15 * (1 - radius / Math.max(width, height));
+                            const warpY = y + Math.cos(angle * 3 + time * 1.5) * 15 * (1 - radius / Math.max(width, height));
+                            
+                            const srcX = Math.min(width-1, Math.max(0, Math.floor(warpX)));
+                            const srcY = Math.min(height-1, Math.max(0, Math.floor(warpY)));
+                            
+                            const srcIdx = (srcY * width + srcX) * 4;
+                            const dstIdx = (y * width + x) * 4;
+                            
+                            outData[dstIdx] = data[srcIdx];
+                            outData[dstIdx+1] = data[srcIdx+1];
+                            outData[dstIdx+2] = data[srcIdx+2];
+                            outData[dstIdx+3] = 255;
+                        }
                     }
-                    return { r: newR, g: newG, b: newB };
+                    return output;
                 }
             },
             
-            munch: {
-                name: 'MUNCH',
-                emoji: '😱',
-                effect: (r, g, b) => {
-                    // The Scream - anxious, intense colors
-                    let newR = Math.min(255, r * 1.4 + g * 0.2);
-                    let newG = Math.min(255, g * 0.5);
-                    let newB = Math.min(255, b * 0.3 + 15);
+            ripple: {
+                name: 'WATER RIPPLE',
+                emoji: '💧',
+                process: (imageData, time) => {
+                    const data = imageData.data;
+                    const width = imageData.width;
+                    const height = imageData.height;
+                    const output = new ImageData(width, height);
+                    const outData = output.data;
                     
-                    // Wavy distortion effect
-                    if (Math.random() > 0.93) {
-                        newR = Math.min(255, newR + 60);
-                        newG = Math.min(255, newG + 30);
+                    // Create water ripple distortion
+                    for (let y = 0; y < height; y++) {
+                        for (let x = 0; x < width; x++) {
+                            const rippleX = x + Math.sin(y * 0.05 + time * 5) * 8;
+                            const rippleY = y + Math.sin(x * 0.05 + time * 4) * 8;
+                            
+                            const srcX = Math.min(width-1, Math.max(0, Math.floor(rippleX)));
+                            const srcY = Math.min(height-1, Math.max(0, Math.floor(rippleY)));
+                            
+                            const srcIdx = (srcY * width + srcX) * 4;
+                            const dstIdx = (y * width + x) * 4;
+                            
+                            outData[dstIdx] = data[srcIdx];
+                            outData[dstIdx+1] = data[srcIdx+1];
+                            outData[dstIdx+2] = data[srcIdx+2];
+                            outData[dstIdx+3] = 255;
+                        }
                     }
-                    return { r: newR, g: newG, b: newB };
+                    return output;
                 }
             },
             
-            hokusai: {
-                name: 'HOKUSAI',
-                emoji: '🌊',
-                effect: (r, g, b) => {
-                    // Great Wave - deep blues and whites
-                    let newR = Math.min(255, r * 0.3);
-                    let newG = Math.min(255, g * 0.5 + b * 0.6);
-                    let newB = Math.min(255, b * 1.2 + 25);
+            morph: {
+                name: 'DREAM MORPH',
+                emoji: '🦋',
+                process: (imageData, time) => {
+                    const data = imageData.data;
+                    const width = imageData.width;
+                    const height = imageData.height;
+                    const output = new ImageData(width, height);
+                    const outData = output.data;
                     
-                    // Wave foam effect on bright areas
-                    if (g > 120 && b > 120 && Math.random() > 0.94) {
-                        newR = 255;
-                        newG = 255;
-                        newB = 255;
+                    // Creates morphing, flowing colors that continuously shift
+                    for (let i = 0; i < data.length; i += 4) {
+                        const r = data[i];
+                        const g = data[i+1];
+                        const b = data[i+2];
+                        
+                        // Colors drift and morph over time
+                        const drift = Math.sin(time + i * 0.0001) * 30;
+                        const drift2 = Math.cos(time * 0.7 + i * 0.0002) * 25;
+                        
+                        outData[i] = Math.min(255, Math.max(0, r + drift + drift2));
+                        outData[i+1] = Math.min(255, Math.max(0, g + drift2 - drift * 0.5));
+                        outData[i+2] = Math.min(255, Math.max(0, b + Math.sin(time * 1.3) * 40));
+                        outData[i+3] = 255;
                     }
-                    return { r: newR, g: newG, b: newB };
+                    return output;
                 }
             },
             
-            picasso: {
-                name: 'PICASSO',
-                emoji: '🎨',
-                effect: (r, g, b) => {
-                    // Cubist effect - fragmented colors
-                    const brightness = (r + g + b) / 3;
-                    let newR, newG, newB;
+            explode: {
+                name: 'PIXEL EXPLODE',
+                emoji: '💥',
+                process: (imageData, time) => {
+                    const data = imageData.data;
+                    const width = imageData.width;
+                    const height = imageData.height;
+                    const output = new ImageData(width, height);
+                    const outData = output.data;
                     
-                    if (brightness > 128) {
-                        newR = Math.min(255, r * 1.3);
-                        newG = Math.min(255, g * 0.6);
-                        newB = Math.min(255, b * 0.8);
-                    } else {
-                        newR = Math.min(255, r * 0.5 + 60);
-                        newG = Math.min(255, g * 0.4 + 40);
-                        newB = Math.min(255, b * 0.6 + 50);
-                    }
+                    // Pixels scatter and regroup like an explosion
+                    const intensity = (Math.sin(time) + 1) / 2;
                     
-                    // Random color blocking
-                    if (Math.random() > 0.97) {
-                        newR = Math.min(255, newR + 80);
-                        newG = Math.min(255, newG);
-                        newB = Math.min(255, newB + 50);
+                    for (let y = 0; y < height; y++) {
+                        for (let x = 0; x < width; x++) {
+                            const angle = Math.atan2(y - height/2, x - width/2);
+                            const radius = Math.sqrt((x - width/2)**2 + (y - height/2)**2);
+                            const offset = Math.sin(time * 3) * 20 * (1 - intensity);
+                            
+                            const srcX = x + Math.cos(angle) * offset;
+                            const srcY = y + Math.sin(angle) * offset;
+                            
+                            const srcX_clamped = Math.min(width-1, Math.max(0, Math.floor(srcX)));
+                            const srcY_clamped = Math.min(height-1, Math.max(0, Math.floor(srcY)));
+                            
+                            const srcIdx = (srcY_clamped * width + srcX_clamped) * 4;
+                            const dstIdx = (y * width + x) * 4;
+                            
+                            outData[dstIdx] = data[srcIdx];
+                            outData[dstIdx+1] = data[srcIdx+1];
+                            outData[dstIdx+2] = data[srcIdx+2];
+                            outData[dstIdx+3] = 255;
+                        }
                     }
-                    return { r: newR, g: newG, b: newB };
+                    return output;
                 }
             },
             
-            monet: {
-                name: 'MONET',
-                emoji: '🌸',
-                effect: (r, g, b) => {
-                    // Impressionist - soft, dreamy colors
-                    let newR = Math.min(255, r * 0.9 + 20);
-                    let newG = Math.min(255, g * 0.95 + b * 0.2);
-                    let newB = Math.min(255, b * 0.9 + 30);
+            fire: {
+                name: 'LIVING FIRE',
+                emoji: '🔥',
+                process: (imageData, time) => {
+                    const data = imageData.data;
+                    const width = imageData.width;
+                    const height = imageData.height;
+                    const output = new ImageData(width, height);
+                    const outData = output.data;
                     
-                    // Soft blur effect via color averaging
-                    if (Math.random() > 0.9) {
-                        newR = Math.min(255, newR * 0.8 + 40);
-                        newG = Math.min(255, newG * 0.85 + 30);
-                        newB = Math.min(255, newB * 0.9 + 20);
+                    // Creates fire-like motion and color shifts
+                    for (let i = 0; i < data.length; i += 4) {
+                        const r = data[i];
+                        const g = data[i+1];
+                        const b = data[i+2];
+                        
+                        const flicker = Math.random() * 40;
+                        const heat = Math.sin(time * 10 + i * 0.0005) * 50;
+                        
+                        // Warm color dominance with movement
+                        outData[i] = Math.min(255, r * 1.2 + flicker + heat);
+                        outData[i+1] = Math.min(255, g * 0.7 + flicker * 0.6);
+                        outData[i+2] = Math.min(255, b * 0.3);
+                        
+                        // Fire wave distortion
+                        const waveY = Math.floor(Math.sin(time * 8 + (i/4) * 0.01) * 10);
+                        outData[i+3] = 255;
                     }
-                    return { r: newR, g: newG, b: newB };
+                    return output;
                 }
             }
         };
         
-        function setArtStyle(style) {
-            currentStyle = style;
-            const styleData = artStyles[style];
-            styleBadge.innerHTML = `🎨 STYLE: ${styleData.name} ${styleData.emoji}`;
-            statusDiv.innerHTML = `🎨 AI ARTIST: ${styleData.name} - Scanning & Transforming...`;
+        function setMotionEffect(effect) {
+            currentEffect = effect;
+            const effectData = motionEffects[effect];
+            effectBadge.innerHTML = `✨ EFFECT: ${effectData.name} ${effectData.emoji}`;
+            statusDiv.innerHTML = `🎬 ${effectData.name} ACTIVATED - Image is now ${effectData.name.toLowerCase()}!`;
             
-            // Visual feedback
             setTimeout(() => {
-                statusDiv.innerHTML = `🔍 AI ART SCANNER - Point camera at any image`;
+                statusDiv.innerHTML = `📸 SCAN ANY IMAGE → WATCH IT COME ALIVE!`;
             }, 2000);
             
-            // Haptic feedback for mobile
+            // Reset morph progress for smooth transition
+            morphProgress = 0;
+            
             if (window.navigator && window.navigator.vibrate) {
                 window.navigator.vibrate(50);
             }
         }
         
-        function applyArtEffect(imageData) {
-            const data = imageData.data;
-            const style = artStyles[currentStyle];
-            
-            // Process pixels with artistic transformation
-            for (let i = 0; i < data.length; i += 4) {
-                const r = data[i];
-                const g = data[i+1];
-                const b = data[i+2];
-                
-                const transformed = style.effect(r, g, b);
-                
-                data[i] = transformed.r;
-                data[i+1] = transformed.g;
-                data[i+2] = transformed.b;
+        function toggleMotion() {
+            isMoving = !isMoving;
+            const btn = document.getElementById('btn-motion');
+            if (isMoving) {
+                btn.innerHTML = '⏸️ FREEZE';
+                statusDiv.innerHTML = '✨ MOTION RESUMED - Image moving again!';
+            } else {
+                btn.innerHTML = '▶️ UNFREEZE';
+                statusDiv.innerHTML = '❄️ FROZEN - Press UNFREEZE to bring back motion';
             }
             
-            return imageData;
+            if (window.navigator && window.navigator.vibrate) {
+                window.navigator.vibrate(30);
+            }
         }
         
-        // Add artistic brush strokes
-        function addBrushStrokes(ctx, width, height) {
-            if (Math.random() > 0.85) return;
+        function applyMotionEffect(sourceImageData) {
+            if (!isMoving) return sourceImageData;
+            
+            const effect = motionEffects[currentEffect];
+            if (!effect) return sourceImageData;
+            
+            try {
+                return effect.process(sourceImageData, time);
+            } catch(e) {
+                return sourceImageData;
+            }
+        }
+        
+        // Add particle effects for extra magic
+        function addParticleMagic(ctx, width, height) {
+            if (!isMoving || Math.random() > 0.95) return;
             
             const imageData = ctx.getImageData(0, 0, width, height);
             const data = imageData.data;
             
-            // Simulate brush strokes
-            for (let i = 0; i < 100; i++) {
+            // Add floating particles that move across the image
+            for (let i = 0; i < 50; i++) {
                 const x = Math.floor(Math.random() * width);
                 const y = Math.floor(Math.random() * height);
                 const idx = (y * width + x) * 4;
                 
-                if (Math.random() > 0.7) {
-                    data[idx] = Math.min(255, data[idx] + 30);
-                    data[idx+1] = Math.min(255, data[idx+1] + 20);
-                } else {
-                    data[idx] = Math.max(0, data[idx] - 20);
-                    data[idx+2] = Math.max(0, data[idx+2] - 20);
+                const timeFactor = Math.sin(time * 5 + x * 0.02) * 30;
+                
+                data[idx] = Math.min(255, data[idx] + 40 + timeFactor);
+                data[idx+1] = Math.min(255, data[idx+1] + 30);
+                
+                if (currentEffect === 'fire') {
+                    data[idx+2] = Math.min(255, data[idx+2] + 60);
                 }
             }
             
             ctx.putImageData(imageData, 0, 0);
-        }
-        
-        // Detect edges for sketch-like effect
-        function addSketchEffect(ctx, width, height) {
-            if (Math.random() > 0.8) return;
-            
-            const imageData = ctx.getImageData(0, 0, width, height);
-            const data = imageData.data;
-            
-            // Simple edge enhancement
-            for (let y = 1; y < height - 1; y++) {
-                for (let x = 1; x < width - 1; x++) {
-                    const idx = (y * width + x) * 4;
-                    const idxUp = ((y-1) * width + x) * 4;
-                    const idxDown = ((y+1) * width + x) * 4;
-                    
-                    const diff = Math.abs(data[idx] - data[idxUp]) + Math.abs(data[idx+1] - data[idxDown+1]);
-                    
-                    if (diff > 50) {
-                        data[idx] = Math.max(0, data[idx] - 40);
-                        data[idx+1] = Math.max(0, data[idx+1] - 40);
-                        data[idx+2] = Math.max(0, data[idx+2] - 40);
-                    }
-                }
-            }
-            
-            ctx.putImageData(imageData, 0, 0);
-        }
-        
-        function captureArtwork() {
-            // Create a downloadable snapshot of the artwork
-            const link = document.createElement('a');
-            link.download = `artwork-${artStyles[currentStyle].name}-${Date.now()}.png`;
-            link.href = canvas.toDataURL();
-            link.click();
-            
-            statusDiv.innerHTML = `📸 ARTWORK CAPTURED! Saved as ${artStyles[currentStyle].name} style`;
-            setTimeout(() => {
-                statusDiv.innerHTML = `🔍 AI ART SCANNER - Point camera at any image`;
-            }, 2000);
-            
-            if (window.navigator && window.navigator.vibrate) {
-                window.navigator.vibrate(100);
-            }
         }
         
         function processFrame() {
-            if (!isProcessing || video.readyState !== 4 || video.videoWidth === 0) {
+            if (video.readyState !== 4 || video.videoWidth === 0) {
                 animationId = requestAnimationFrame(processFrame);
                 return;
             }
             
-            // Match canvas size to video
+            // Match canvas size
             if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
             }
             
             try {
-                // Draw current camera frame (what you're scanning)
+                // Capture current camera frame (the static image you're scanning)
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 
-                // Apply AI art transformation
+                // Get the image data
                 let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                imageData = applyArtEffect(imageData);
+                
+                // Apply motion effect to make it come alive!
+                imageData = applyMotionEffect(imageData);
+                
+                // Put back the moving artwork
                 ctx.putImageData(imageData, 0, 0);
                 
-                // Add artistic finishing touches
-                addBrushStrokes(ctx, canvas.width, canvas.height);
-                addSketchEffect(ctx, canvas.width, canvas.height);
+                // Add magical particles
+                addParticleMagic(ctx, canvas.width, canvas.height);
+                
+                // Update time for continuous animation
+                time += 0.05;
                 
             } catch(e) {
                 // Silent fail for frame skips
@@ -423,7 +482,7 @@
         
         async function initCamera() {
             try {
-                statusDiv.innerHTML = "📸 ACCESSING CAMERA - Ready to scan images...";
+                statusDiv.innerHTML = "🎥 CAMERA INITIALIZING - Get ready to bring images to life!";
                 
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: {
@@ -437,7 +496,7 @@
                 
                 return new Promise((resolve) => {
                     video.onloadeddata = () => {
-                        statusDiv.innerHTML = "✅ SCANNER READY - Point any image at camera to see AI artwork!";
+                        statusDiv.innerHTML = "✅ SCAN ANY IMAGE - Watch it MOVE & COME ALIVE!";
                         canvas.width = video.videoWidth;
                         canvas.height = video.videoHeight;
                         resolve();
@@ -458,7 +517,7 @@
             }
         }
         
-        // Start the AI Art Scanner
+        // Start the AI Motion Scanner
         start();
     </script>
 </body>
