@@ -1,94 +1,54 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8" />
-
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0, user-scalable=no"
-  />
-
-  <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-
-  <style>
-    html, body {
-      margin: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-    }
-  </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>S26 Ultra AR Player</title>
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        #info {
+            position: absolute; top: 10px; left: 10px; z-index: 100;
+            color: white; font-family: sans-serif; background: rgba(0,0,0,0.6);
+            padding: 10px; border-radius: 8px; pointer-events: none;
+        }
+    </style>
 </head>
-
 <body>
 
-<a-scene
-  mindar-image="imageTargetSrc: ./targets.mind;"
-  color-space="sRGB"
-  embedded
-  vr-mode-ui="enabled: false"
-  device-orientation-permission-ui="enabled: false"
->
+    <div id="info">Scanning for your image target...</div>
 
-  <a-assets>
+    <a-scene mindar-image="imageTargetSrc: ./targets.mind;" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+        <a-assets>
+            <!-- IMPORTANT: Change 'video.mp4' to your video file name -->
+            <video id="vid" src="./video.mp4" loop="true" crossorigin="anonymous" playsinline webkit-playsinline></video>
+        </a-assets>
 
-    <video
-      id="video"
-      src="./video.mp4"
-      loop
-      muted
-      playsinline
-      webkit-playsinline
-      crossorigin="anonymous"
-    ></video>
+        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-  </a-assets>
+        <a-entity id="target" mindar-image-target="targetIndex: 0">
+            <a-video src="#vid" width="1" height="0.6" position="0 0 0" rotation="0 0 0"></a-video>
+        </a-entity>
+    </a-scene>
 
-  <a-camera
-    position="0 0 0"
-    look-controls="enabled: false"
-  ></a-camera>
+    <script>
+        const targetEl = document.querySelector('#target');
+        const videoEl = document.querySelector('#vid');
+        const infoEl = document.querySelector('#info');
 
-  <a-entity mindar-image-target="targetIndex: 0">
+        targetEl.addEventListener("targetFound", () => {
+            infoEl.innerText = "Target Found - Playing";
+            videoEl.play();
+        });
 
-    <a-video
-      src="#video"
-      position="0 0 0"
-      width="1"
-      height="1.7"
-    ></a-video>
+        targetEl.addEventListener("targetLost", () => {
+            infoEl.innerText = "Scanning for image...";
+            videoEl.pause();
+        });
 
-  </a-entity>
-
-</a-scene>
-
-<script>
-const video = document.querySelector("#video");
-
-const target = document.querySelector("[mindar-image-target]");
-
-target.addEventListener("targetFound", async () => {
-
-  try {
-
-    await video.play();
-
-  } catch(err) {
-
-    console.log(err);
-
-  }
-
-});
-
-target.addEventListener("targetLost", () => {
-
-  video.pause();
-
-});
-</script>
-
+        window.addEventListener('click', () => {
+            videoEl.muted = false;
+        });
+    </script>
 </body>
 </html>
