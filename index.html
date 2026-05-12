@@ -1,301 +1,122 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI Video Art Creator</title>
-    <style>
-        :root {
-            --primary: #007AFF;
-            --bg: #000;
-            --text: #fff;
-        }
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, user-scalable=no"
+  />
 
-        body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            background-color: var(--bg);
-            color: var(--text);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-        }
+  <title>MindAR Video Tracking</title>
 
-        #container {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
+  <!-- A-Frame -->
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
 
-        video, canvas {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
+  <!-- MindAR -->
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
-        #artCanvas {
-            display: none;
-            z-index: 10;
-        }
+  <style>
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: black;
+    }
 
-        .ui-overlay {
-            position: absolute;
-            bottom: 40px;
-            left: 0;
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            z-index: 20;
-        }
-
-        .btn {
-            background: rgba(255, 255, 255, 0.2);
-            backdrop-filter: blur(10px);
-            border: 2px solid #fff;
-            color: #fff;
-            padding: 15px 30px;
-            border-radius: 50px;
-            font-size: 18px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: transform 0.2s, background 0.2s;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .btn:active {
-            transform: scale(0.95);
-            background: rgba(255, 255, 255, 0.4);
-        }
-
-        .btn-capture {
-            background: var(--primary);
-            border-color: var(--primary);
-        }
-
-        #status {
-            position: absolute;
-            top: 20px;
-            width: 100%;
-            text-align: center;
-            font-size: 14px;
-            opacity: 0.7;
-            z-index: 20;
-            pointer-events: none;
-        }
-
-        .hidden {
-            display: none !important;
-        }
-
-        /* Loading Spinner */
-        #loader {
-            position: absolute;
-            z-index: 30;
-            display: none;
-        }
-        .spinner {
-            width: 50px;
-            height: 50px;
-            border: 5px solid rgba(255,255,255,0.3);
-            border-top: 5px solid #fff;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    </style>
+    #loading {
+      position: fixed;
+      z-index: 999;
+      width: 100%;
+      top: 20px;
+      text-align: center;
+      color: white;
+      font-family: Arial;
+      font-size: 18px;
+    }
+  </style>
 </head>
+
 <body>
 
-    <div id="status">Pointing to an image...</div>
+<div id="loading">
+  Point camera to target image...
+</div>
 
-    <div id="container">
-        <video id="video" autoplay playsinline muted></video>
-        <canvas id="artCanvas"></canvas>
-        <div id="loader"><div class="spinner"></div></div>
-    </div>
+<a-scene
+  mindar-image="imageTargetSrc: targets.mind; autoStart: true;"
+  color-space="sRGB"
+  renderer="colorManagement: true, physicallyCorrectLights"
+  vr-mode-ui="enabled: false"
+  device-orientation-permission-ui="enabled: false"
+>
 
-    <div class="ui-overlay">
-        <button id="captureBtn" class="btn btn-capture">Capture & Create Art</button>
-        <button id="resetBtn" class="btn hidden">Reset Camera</button>
-    </div>
+  <!-- Camera -->
+  <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-    <!-- Hidden canvas for pixel extraction -->
-    <canvas id="bufferCanvas" style="display:none;"></canvas>
+  <!-- Image Target -->
+  <a-entity mindar-image-target="targetIndex: 0">
 
-    <script>
-        const video = document.getElementById('video');
-        const artCanvas = document.getElementById('artCanvas');
-        const bufferCanvas = document.getElementById('bufferCanvas');
-        const captureBtn = document.getElementById('captureBtn');
-        const resetBtn = document.getElementById('resetBtn');
-        const statusText = document.getElementById('status');
-        const loader = document.getElementById('loader');
+    <!-- Video -->
+    <a-video
+      id="videoPlane"
+      src="#myVideo"
+      width="1"
+      height="1.7"
+      position="0 0 0"
+      rotation="0 0 0"
+    >
+    </a-video>
 
-        const ctx = artCanvas.getContext('2d');
-        const bufferCtx = bufferCanvas.getContext('2d');
+  </a-entity>
 
-        let particles = [];
-        let animationId = null;
-        let isArtMode = false;
+  <!-- Assets -->
+  <a-assets>
+    <video
+      id="myVideo"
+      src="video.mp4"
+      preload="auto"
+      loop
+      muted
+      playsinline
+      webkit-playsinline
+      crossorigin="anonymous"
+    ></video>
+  </a-assets>
 
-        // Configuration
-        const PARTICLE_DENSITY = 10; // Sample every N pixels
-        const SPEED_FACTOR = 0.5;
+</a-scene>
 
-        class Particle {
-            constructor(x, y, color) {
-                this.x = x;
-                this.y = y;
-                this.originX = x;
-                this.originY = y;
-                this.color = color;
-                this.size = Math.random() * 2 + 1;
-                this.vx = (Math.random() - 0.5) * SPEED_FACTOR;
-                this.vy = (Math.random() - 0.5) * SPEED_FACTOR;
-                this.angle = Math.random() * Math.PI * 2;
-                this.friction = 0.95;
-            }
+<script>
+  const video = document.querySelector("#myVideo");
+  const target = document.querySelector("[mindar-image-target]");
 
-            update() {
-                // Gentle swirling motion
-                this.angle += 0.01;
-                this.vx += Math.cos(this.angle) * 0.05;
-                this.vy += Math.sin(this.angle) * 0.05;
+  // When image found
+  target.addEventListener("targetFound", () => {
+    console.log("Target Found");
 
-                this.x += this.vx;
-                this.y += this.vy;
+    video.currentTime = 0;
 
-                // Wrap around edges
-                if (this.x < 0) this.x = artCanvas.width;
-                if (this.x > artCanvas.width) this.x = 0;
-                if (this.y < 0) this.y = artCanvas.height;
-                if (this.y > artCanvas.height) this.y = 0;
-            }
+    const playPromise = video.play();
 
-            draw() {
-                ctx.fillStyle = this.color;
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        }
-
-        async function initCamera() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: 'environment',
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    },
-                    audio: false
-                });
-                video.srcObject = stream;
-            } catch (err) {
-                console.error("Error accessing camera:", err);
-                statusText.innerText = "Camera access denied or not found.";
-            }
-        }
-
-        function captureImage() {
-            isArtMode = true;
-            loader.style.display = 'block';
-            statusText.innerText = "Generating Art...";
-
-            // Match canvas sizes
-            artCanvas.width = window.innerWidth;
-            artCanvas.height = window.innerHeight;
-            bufferCanvas.width = video.videoWidth;
-            bufferCanvas.height = video.videoHeight;
-
-            // Draw video frame to buffer
-            bufferCtx.drawImage(video, 0, 0, bufferCanvas.width, bufferCanvas.height);
-            const imageData = bufferCtx.getImageData(0, 0, bufferCanvas.width, bufferCanvas.height);
-            const data = imageData.data;
-
-            // Initialize Particles
-            particles = [];
-            const scaleX = artCanvas.width / bufferCanvas.width;
-            const scaleY = artCanvas.height / bufferCanvas.height;
-
-            for (let y = 0; y < bufferCanvas.height; y += PARTICLE_DENSITY) {
-                for (let x = 0; x < bufferCanvas.width; x += PARTICLE_DENSITY) {
-                    const index = (y * bufferCanvas.width + x) * 4;
-                    const r = data[index];
-                    const g = data[index + 1];
-                    const b = data[index + 2];
-                    const a = data[index + 3];
-
-                    if (a > 128) {
-                        const color = `rgba(${r},${g},${b},${a/255})`;
-                        particles.push(new Particle(x * scaleX, y * scaleY, color));
-                    }
-                }
-            }
-
-            // UI Changes
-            video.style.display = 'none';
-            artCanvas.style.display = 'block';
-            captureBtn.classList.add('hidden');
-            resetBtn.classList.remove('hidden');
-            loader.style.display = 'none';
-
-            animate();
-        }
-
-        function animate() {
-            if (!isArtMode) return;
-            
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.05)'; // Trail effect
-            ctx.fillRect(0, 0, artCanvas.width, artCanvas.height);
-
-            particles.forEach(p => {
-                p.update();
-                p.draw();
-            });
-
-            animationId = requestAnimationFrame(animate);
-        }
-
-        function reset() {
-            isArtMode = false;
-            cancelAnimationFrame(animationId);
-            
-            video.style.display = 'block';
-            artCanvas.style.display = 'none';
-            captureBtn.classList.remove('hidden');
-            resetBtn.classList.add('hidden');
-            statusText.innerText = "Pointing to an image...";
-        }
-
-        captureBtn.addEventListener('click', captureImage);
-        resetBtn.addEventListener('click', reset);
-
-        // Initialize
-        initCamera();
-
-        // Handle resize
-        window.addEventListener('resize', () => {
-            if (isArtMode) {
-                artCanvas.width = window.innerWidth;
-                artCanvas.height = window.innerHeight;
-            }
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => {
+          console.log("Video playing");
+        })
+        .catch((error) => {
+          console.log(error);
         });
-    </script>
+    }
+  });
+
+  // When image lost
+  target.addEventListener("targetLost", () => {
+    console.log("Target Lost");
+
+    video.pause();
+  });
+</script>
+
 </body>
 </html>
