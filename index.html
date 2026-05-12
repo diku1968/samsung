@@ -1,0 +1,298 @@
+1 <!DOCTYPE html>
+     2 <html lang="en">
+     3 <head>
+     4     <meta charset="UTF-8">
+     5     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+     6     <title>AI Video Art Creator</title>
+     7     <style>
+     8         :root {
+     9             --primary: #007AFF;
+    10             --bg: #000;
+    11             --text: #fff;
+    12         }
+    13
+    14         body, html {
+    15             margin: 0;
+    16             padding: 0;
+    17             width: 100%;
+    18             height: 100%;
+    19             background-color: var(--bg);
+    20             color: var(--text);
+    21             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    22             overflow: hidden;
+    23             display: flex;
+    24             flex-direction: column;
+    25             justify-content: center;
+    26             align-items: center;
+    27         }
+    28
+    29         #container {
+    30             position: relative;
+    31             width: 100%;
+    32             height: 100%;
+    33             display: flex;
+    34             justify-content: center;
+    35             align-items: center;
+    36         }
+    37
+    38         video, canvas {
+    39             position: absolute;
+    40             width: 100%;
+    41             height: 100%;
+    42             object-fit: cover;
+    43         }
+    44
+    45         #artCanvas {
+    46             display: none;
+    47             z-index: 10;
+    48         }
+    49
+    50         .ui-overlay {
+    51             position: absolute;
+    52             bottom: 40px;
+    53             left: 0;
+    54             width: 100%;
+    55             display: flex;
+    56             justify-content: center;
+    57             gap: 20px;
+    58             z-index: 20;
+    59         }
+    60
+    61         .btn {
+    62             background: rgba(255, 255, 255, 0.2);
+    63             backdrop-filter: blur(10px);
+    64             border: 2px solid #fff;
+    65             color: #fff;
+    66             padding: 15px 30px;
+    67             border-radius: 50px;
+    68             font-size: 18px;
+    69             font-weight: bold;
+    70             cursor: pointer;
+    71             transition: transform 0.2s, background 0.2s;
+    72             box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    73             text-transform: uppercase;
+    74             letter-spacing: 1px;
+    75         }
+    76
+    77         .btn:active {
+    78             transform: scale(0.95);
+    79             background: rgba(255, 255, 255, 0.4);
+    80         }
+    81
+    82         .btn-capture {
+    83             background: var(--primary);
+    84             border-color: var(--primary);
+    85         }
+    86
+    87         #status {
+    88             position: absolute;
+    89             top: 20px;
+    90             width: 100%;
+    91             text-align: center;
+    92             font-size: 14px;
+    93             opacity: 0.7;
+    94             z-index: 20;
+    95             pointer-events: none;
+    96         }
+    97
+    98         .hidden {
+    99             display: none !important;
+   100         }
+   101
+   102         /* Loading Spinner */
+   103         #loader {
+   104             position: absolute;
+   105             z-index: 30;
+   106             display: none;
+   107         }
+   108         .spinner {
+   109             width: 50px;
+   110             height: 50px;
+   111             border: 5px solid rgba(255,255,255,0.3);
+   112             border-top: 5px solid #fff;
+   113             border-radius: 50%;
+   114             animation: spin 1s linear infinite;
+   115         }
+   116         @keyframes spin {
+   117             0% { transform: rotate(0deg); }
+   118             100% { transform: rotate(360deg); }
+   119         }
+   120     </style>
+   121 </head>
+   122 <body>
+   123
+   124     <div id="status">Pointing to an image...</div>
+   125
+   126     <div id="container">
+   127         <video id="video" autoplay playsinline muted></video>
+   128         <canvas id="artCanvas"></canvas>
+   129         <div id="loader"><div class="spinner"></div></div>
+   130     </div>
+   131
+   132     <div class="ui-overlay">
+   133         <button id="captureBtn" class="btn btn-capture">Capture & Create Art</button>
+   134         <button id="resetBtn" class="btn hidden">Reset Camera</button>
+   135     </div>
+   136
+   137     <!-- Hidden canvas for pixel extraction -->
+   138     <canvas id="bufferCanvas" style="display:none;"></canvas>
+   139
+   140     <script>
+   141         const video = document.getElementById('video');
+   142         const artCanvas = document.getElementById('artCanvas');
+   143         const bufferCanvas = document.getElementById('bufferCanvas');
+   144         const captureBtn = document.getElementById('captureBtn');
+   145         const resetBtn = document.getElementById('resetBtn');
+   146         const statusText = document.getElementById('status');
+   147         const loader = document.getElementById('loader');
+   148
+   149         const ctx = artCanvas.getContext('2d');
+   150         const bufferCtx = bufferCanvas.getContext('2d');
+   151
+   152         let particles = [];
+   153         let animationId = null;
+   154         let isArtMode = false;
+   155
+   156         // Configuration
+   157         const PARTICLE_DENSITY = 10; // Sample every N pixels
+   158         const SPEED_FACTOR = 0.5;
+   159
+   160         class Particle {
+   161             constructor(x, y, color) {
+   162                 this.x = x;
+   163                 this.y = y;
+   164                 this.originX = x;
+   165                 this.originY = y;
+   166                 this.color = color;
+   167                 this.size = Math.random() * 2 + 1;
+   168                 this.vx = (Math.random() - 0.5) * SPEED_FACTOR;
+   169                 this.vy = (Math.random() - 0.5) * SPEED_FACTOR;
+   170                 this.angle = Math.random() * Math.PI * 2;
+   171             }
+   172
+   173             update() {
+   174                 // Gentle swirling motion
+   175                 this.angle += 0.01;
+   176                 this.vx += Math.cos(this.angle) * 0.05;
+   177                 this.vy += Math.sin(this.angle) * 0.05;
+   178
+   179                 this.x += this.vx;
+   180                 this.y += this.vy;
+   181
+   182                 // Wrap around edges
+   183                 if (this.x < 0) this.x = artCanvas.width;
+   184                 if (this.x > artCanvas.width) this.x = 0;
+   185                 if (this.y < 0) this.y = artCanvas.height;
+   186                 if (this.y > artCanvas.height) this.y = 0;
+   187             }
+   188
+   189             draw() {
+   190                 ctx.fillStyle = this.color;
+   191                 ctx.beginPath();
+   192                 ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+   193                 ctx.fill();
+   194             }
+   195         }
+   196
+   197         async function initCamera() {
+   198             try {
+   199                 const stream = await navigator.mediaDevices.getUserMedia({
+   200                     video: {
+   201                         facingMode: 'environment',
+   202                         width: { ideal: 1280 },
+   203                         height: { ideal: 720 }
+   204                     },
+   205                     audio: false
+   206                 });
+   207                 video.srcObject = stream;
+   208             } catch (err) {
+   209                 console.error("Error accessing camera:", err);
+   210                 statusText.innerText = "Camera access denied or not found.";
+   211             }
+   212         }
+   213
+   214         function captureImage() {
+   215             isArtMode = true;
+   216             loader.style.display = 'block';
+   217             statusText.innerText = "Generating Art...";
+   218
+   219             // Match canvas sizes
+   220             artCanvas.width = window.innerWidth;
+   221             artCanvas.height = window.innerHeight;
+   222             bufferCanvas.width = video.videoWidth;
+   223             bufferCanvas.height = video.videoHeight;
+   224
+   225             // Draw video frame to buffer
+   226             bufferCtx.drawImage(video, 0, 0, bufferCanvas.width, bufferCanvas.height);
+   227             const imageData = bufferCtx.getImageData(0, 0, bufferCanvas.width, bufferCanvas.height);
+   228             const data = imageData.data;
+   229
+   230             // Initialize Particles
+   231             particles = [];
+   232             const scaleX = artCanvas.width / bufferCanvas.width;
+   233             const scaleY = artCanvas.height / bufferCanvas.height;
+   234
+   235             for (let y = 0; y < bufferCanvas.height; y += PARTICLE_DENSITY) {
+   236                 for (let x = 0; x < bufferCanvas.width; x += PARTICLE_DENSITY) {
+   237                     const index = (y * bufferCanvas.width + x) * 4;
+   238                     const r = data[index];
+   239                     const g = data[index + 1];
+   240                     const b = data[index + 2];
+   241                     const a = data[index + 3];
+   242
+   243                     if (a > 128) {
+   244                         const color = `rgba(${r},${g},${b},${a/255})`;
+   245                         particles.push(new Particle(x * scaleX, y * scaleY, color));
+   246                     }
+   247                 }
+   248             }
+   249
+   250             // UI Changes
+   251             video.style.display = 'none';
+   252             artCanvas.style.display = 'block';
+   253             captureBtn.classList.add('hidden');
+   254             resetBtn.classList.remove('hidden');
+   255             loader.style.display = 'none';
+   256
+   257             animate();
+   258         }
+   259
+   260         function animate() {
+   261             if (!isArtMode) return;
+   262
+   263             ctx.fillStyle = 'rgba(0, 0, 0, 0.05)'; // Trail effect
+   264             ctx.fillRect(0, 0, artCanvas.width, artCanvas.height);
+   265
+   266             particles.forEach(p => {
+   267                 p.update();
+   268                 p.draw();
+   269             });
+   270
+   271             animationId = requestAnimationFrame(animate);
+   272         }
+   273
+   274         function reset() {
+   275             isArtMode = false;
+   276             cancelAnimationFrame(animationId);
+   277
+   278             video.style.display = 'block';
+   279             artCanvas.style.display = 'none';
+   280             captureBtn.classList.remove('hidden');
+   281             resetBtn.classList.add('hidden');
+   282             statusText.innerText = "Pointing to an image...";
+   283         }
+   284
+   285         captureBtn.addEventListener('click', captureImage);
+   286         resetBtn.addEventListener('click', reset);
+   287
+   288         initCamera();
+   289
+   290         window.addEventListener('resize', () => {
+   291             if (isArtMode) {
+   292                 artCanvas.width = window.innerWidth;
+   293                 artCanvas.height = window.innerHeight;
+   294             }
+   295         });
+   296     </script>
+   297 </body>
+   298 </html>
