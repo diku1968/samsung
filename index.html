@@ -19,10 +19,8 @@
             overflow: hidden;
             height: 100dvh;
             width: 100%;
-            touch-action: pan-x pan-y; /* allow scrolling only if needed, but we lock */
         }
 
-        /* main container */
         .app-container {
             position: relative;
             width: 100%;
@@ -31,7 +29,6 @@
             isolation: isolate;
         }
 
-        /* video & canvas layers */
         .media-layer {
             position: absolute;
             top: 0;
@@ -54,7 +51,6 @@
             display: none;
         }
 
-        /* ui overlay */
         .ui-bar {
             position: absolute;
             bottom: 32px;
@@ -70,9 +66,9 @@
 
         .btn {
             pointer-events: auto;
-            background: rgba(20, 20, 30, 0.75);
+            background: rgba(20, 20, 30, 0.85);
             backdrop-filter: blur(16px);
-            border: 1.5px solid rgba(255, 255, 255, 0.65);
+            border: 1.5px solid rgba(255, 255, 255, 0.7);
             color: white;
             padding: 14px 28px;
             border-radius: 60px;
@@ -98,7 +94,7 @@
         }
 
         .btn-secondary {
-            background: rgba(0, 0, 0, 0.6);
+            background: rgba(0, 0, 0, 0.7);
             border-color: rgba(255, 255, 255, 0.9);
         }
 
@@ -107,7 +103,12 @@
             background: rgba(50, 50, 70, 0.8);
         }
 
-        /* status & loader */
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
         .status-area {
             position: absolute;
             top: 20px;
@@ -117,16 +118,17 @@
             z-index: 25;
             font-size: 14px;
             font-weight: 500;
-            color: rgba(255, 255, 255, 0.9);
+            color: rgba(255, 255, 255, 0.95);
             text-shadow: 0 1px 4px black;
-            background: rgba(0, 0, 0, 0.4);
-            backdrop-filter: blur(4px);
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(8px);
             width: fit-content;
             margin: 0 auto;
             padding: 8px 20px;
             border-radius: 40px;
             letter-spacing: 0.3px;
             pointer-events: none;
+            transition: opacity 0.3s;
         }
 
         .loader {
@@ -135,12 +137,12 @@
             left: 50%;
             transform: translate(-50%, -50%);
             z-index: 30;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.85);
             backdrop-filter: blur(12px);
-            padding: 20px 24px;
+            padding: 20px 28px;
             border-radius: 60px;
             display: flex;
-            gap: 12px;
+            gap: 14px;
             align-items: center;
             justify-content: center;
             border: 1px solid rgba(255,255,255,0.2);
@@ -171,11 +173,10 @@
             display: none !important;
         }
 
-        /* subtle vignette overlay for camera style */
         .vignette {
             position: absolute;
             inset: 0;
-            background: radial-gradient(circle at center, transparent 60%, rgba(0,0,0,0.3) 100%);
+            background: radial-gradient(circle at center, transparent 60%, rgba(0,0,0,0.25) 100%);
             z-index: 3;
             pointer-events: none;
         }
@@ -183,6 +184,8 @@
         @media (max-width: 640px) {
             .btn { padding: 10px 20px; font-size: 0.85rem; }
             .status-area { font-size: 12px; top: 12px; padding: 6px 16px; }
+            .loader { padding: 14px 22px; }
+            .loader-text { font-size: 0.9rem; }
         }
     </style>
 </head>
@@ -192,15 +195,15 @@
     <canvas id="artCanvas" class="media-layer"></canvas>
     <div class="vignette"></div>
 
-    <div id="statusMessage" class="status-area">✨ Ready · Point camera at any scene</div>
+    <div id="statusMessage" class="status-area">📷 Requesting camera access...</div>
 
     <div id="loaderOverlay" class="loader hidden">
         <div class="spinner"></div>
-        <span class="loader-text">Generating AI art flow...</span>
+        <span class="loader-text">Creating particle art...</span>
     </div>
 
     <div class="ui-bar">
-        <button id="captureBtn" class="btn btn-primary">✨ Capture & Morph</button>
+        <button id="captureBtn" class="btn btn-primary" disabled>✨ Capture & Morph</button>
         <button id="resetBtn" class="btn btn-secondary hidden">⟳ Reset Camera</button>
     </div>
 </div>
@@ -209,7 +212,7 @@
 
 <script>
     (function(){
-        // ----- DOM elements -----
+        // DOM elements
         const video = document.getElementById('video');
         const artCanvas = document.getElementById('artCanvas');
         const bufferCanvas = document.getElementById('bufferCanvas');
@@ -221,73 +224,57 @@
         const ctx = artCanvas.getContext('2d');
         const bufferCtx = bufferCanvas.getContext('2d');
 
-        // ----- state -----
+        // State
         let particles = [];
         let animationFrameId = null;
         let isArtModeActive = false;
         let currentStream = null;
+        let cameraReady = false;
 
-        // art parameters - elegant swarm
-        const PARTICLE_SAMPLE_STEP = 8;        // step 8px for good density/performance
+        // Art parameters
+        const PARTICLE_SAMPLE_STEP = 8;
         const BASE_SPEED = 0.42;
-        const TRAIL_FADE = 0.06;               // smooth motion trail
-        
-        // ----- helper: update canvas dimensions on resize -----
+        const TRAIL_FADE = 0.06;
+
         function resizeCanvasToDisplay() {
             const w = window.innerWidth;
             const h = window.innerHeight;
             if (!isArtModeActive) {
-                // just keep canvas dimensions for future
                 artCanvas.width = w;
                 artCanvas.height = h;
             } else {
-                // during art mode, preserve existing particles but adjust? we don't reposition but we avoid glitches
-                // we keep previous dimensions to avoid chaos; we only adjust when resetting or during init capture.
-                // but we update for consistency.
                 if(artCanvas.width !== w || artCanvas.height !== h) {
-                    // if dimensions changed while animating, we recreate dimensions (scale will cause shift but reset is smoother).
-                    // better to just preserve old dimensions, but we resize context to avoid distortion.
-                    // However repaint will adapt new dimensions for new particles when recaptured. So we only update during capture.
-                    // but we don't want clipping -> we set new size but particles coordinates remain relative to old size, will be off.
-                    // to keep smooth: resize canvas but do NOT remap particles -> they might go outside, but wrap-around logic works.
                     artCanvas.width = w;
                     artCanvas.height = h;
                 }
             }
         }
 
-        // ----- particle class with elegant fluid motion, color & soft glow -----
+        // Particle class
         class ParticleFlow {
             constructor(x, y, colorRgb) {
                 this.x = x;
                 this.y = y;
                 this.originX = x;
                 this.originY = y;
-                this.color = colorRgb;   // store rgba string
-                this.size = Math.random() * 2.4 + 1.2;   // 1.2 - 3.6px, organic
-                // smooth velocity with gentle drift
+                this.color = colorRgb;
+                this.size = Math.random() * 2.4 + 1.2;
                 this.vx = (Math.random() - 0.5) * BASE_SPEED * 1.2;
                 this.vy = (Math.random() - 0.5) * BASE_SPEED * 1.2;
                 this.angle = Math.random() * Math.PI * 2;
-                this.phase = Math.random() * Math.PI * 2;
-                this.noiseSpeed = 0.008 + Math.random() * 0.01;
             }
 
             update(width, height) {
-                // organic sinusoidal flow + gentle random walk
                 this.angle += 0.012;
                 const driftX = Math.sin(this.angle * 0.7) * 0.12;
                 const driftY = Math.cos(this.angle * 0.5) * 0.12;
                 
-                // subtle noise influence
                 this.vx += driftX + (Math.random() - 0.5) * 0.08;
                 this.vy += driftY + (Math.random() - 0.5) * 0.08;
                 
-                // damping to keep smooth but lively
                 this.vx *= 0.99;
                 this.vy *= 0.99;
                 
-                // limit speed so particles don't blast away drastically
                 const maxSpeed = 2.2;
                 this.vx = Math.min(maxSpeed, Math.max(-maxSpeed, this.vx));
                 this.vy = Math.min(maxSpeed, Math.max(-maxSpeed, this.vy));
@@ -295,7 +282,6 @@
                 this.x += this.vx;
                 this.y += this.vy;
                 
-                // wrap-around with edges (create infinite canvas feeling)
                 if (this.x < 0) this.x = width;
                 if (this.x > width) this.x = 0;
                 if (this.y < 0) this.y = height;
@@ -305,22 +291,18 @@
             draw(ctx) {
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                // use fill style with slight transparency for glow-like blending
                 ctx.fillStyle = this.color;
                 ctx.fill();
-                // optional tiny inner highlight for some magic
                 if(this.size > 1.8) {
                     ctx.beginPath();
                     ctx.arc(this.x-0.5, this.y-0.5, this.size*0.25, 0, Math.PI*2);
-                    ctx.fillStyle = 'rgba(255,255,200,0.3)';
+                    ctx.fillStyle = 'rgba(255,255,200,0.25)';
                     ctx.fill();
                 }
             }
         }
 
-        // ----- generate particles from captured video frame (deep color sampling) -----
         function generateParticlesFromFrame() {
-            // ensure buffer dimensions match video source
             const videoWidth = video.videoWidth;
             const videoHeight = video.videoHeight;
             
@@ -329,14 +311,11 @@
                 return false;
             }
             
-            // set buffer canvas to exact video frame size
             bufferCanvas.width = videoWidth;
             bufferCanvas.height = videoHeight;
             
-            // draw current video frame onto buffer
             bufferCtx.drawImage(video, 0, 0, videoWidth, videoHeight);
             
-            // get pixel data
             let imageData;
             try {
                 imageData = bufferCtx.getImageData(0, 0, videoWidth, videoHeight);
@@ -346,8 +325,6 @@
             }
             
             const data = imageData.data;
-            
-            // define target canvas dimensions (full screen)
             const targetW = window.innerWidth;
             const targetH = window.innerHeight;
             artCanvas.width = targetW;
@@ -358,10 +335,8 @@
             
             const newParticles = [];
             const step = PARTICLE_SAMPLE_STEP;
-            
-            // sample pixels, limit max particles for performance (still rich)
-            let maxParticlesLimit = 18000;
             let particleCount = 0;
+            const maxParticlesLimit = 15000;
             
             for (let y = 0; y < videoHeight; y += step) {
                 for (let x = 0; x < videoWidth; x += step) {
@@ -372,9 +347,7 @@
                     const b = data[idx+2];
                     const a = data[idx+3];
                     
-                    // skip nearly transparent & very dark areas optionally but keep richness
                     if (a > 40 && (r+g+b > 30)) {
-                        // preserve original vibrant color, slight alpha blending for particle clouds
                         const alphaFactor = 0.85;
                         const colorStr = `rgba(${r}, ${g}, ${b}, ${alphaFactor})`;
                         const px = x * scaleX + (Math.random() * 1.5 - 0.75);
@@ -382,7 +355,6 @@
                         newParticles.push(new ParticleFlow(px, py, colorStr));
                         particleCount++;
                     } else if ((r+g+b) > 20) {
-                        // also include mid-low brightness with slight opacity
                         const colorStr = `rgba(${r}, ${g}, ${b}, 0.7)`;
                         const px = x * scaleX;
                         const py = y * scaleY;
@@ -393,9 +365,7 @@
                 if (particleCount > maxParticlesLimit) break;
             }
             
-            // if particle count is too low for interesting visuals (e.g. dark scene), we add subtle halos
             if (newParticles.length < 800) {
-                // fill small amount of extra decorative particles based on predominant colors
                 for (let i = 0; i < 600; i++) {
                     const randX = Math.random() * targetW;
                     const randY = Math.random() * targetH;
@@ -408,21 +378,15 @@
             return true;
         }
         
-        // ----- animation loop with trail & motion blur effect -----
         function startArtAnimation() {
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
-            
-            const w = artCanvas.width;
-            const h = artCanvas.height;
             
             function drawFrame() {
                 if (!isArtModeActive) return;
                 
-                // clear canvas with soft fade trail (creates motion blur / afterglow)
                 ctx.fillStyle = `rgba(0, 0, 0, ${TRAIL_FADE})`;
                 ctx.fillRect(0, 0, artCanvas.width, artCanvas.height);
                 
-                // update and draw all particles
                 const currentW = artCanvas.width;
                 const currentH = artCanvas.height;
                 for (let p of particles) {
@@ -436,43 +400,41 @@
             drawFrame();
         }
         
-        // ----- capture image and transition to art mode -----
         async function onCaptureAndCreate() {
-            if (isArtModeActive) return;
-            
-            // verify video is ready
-            if (!video.videoWidth || !video.videoHeight) {
-                statusDiv.innerText = "⚠️ Camera not ready, try again";
-                setTimeout(() => {
-                    if(!isArtModeActive) statusDiv.innerText = "🎥 Ready · Point camera at any scene";
-                }, 1500);
+            if (isArtModeActive || !cameraReady) {
+                if (!cameraReady) {
+                    statusDiv.innerText = "⚠️ Camera not ready yet, please wait...";
+                    setTimeout(() => {
+                        if(!isArtModeActive && cameraReady) statusDiv.innerText = "🎥 Ready · Point camera at any scene";
+                    }, 2000);
+                }
                 return;
             }
             
-            // show loading overlay
-            loaderOverlay.classList.remove('hidden');
-            statusDiv.innerText = "🎨 AI analyzing pixels & creating particle swarm...";
+            if (!video.videoWidth || !video.videoHeight) {
+                statusDiv.innerText = "⚠️ Camera not ready, try again";
+                return;
+            }
             
-            // slight delay to ensure UI update & frame stability
-            await new Promise(r => setTimeout(r, 50));
+            loaderOverlay.classList.remove('hidden');
+            statusDiv.innerText = "🎨 Creating particle swarm...";
+            
+            await new Promise(r => setTimeout(r, 30));
             
             const success = generateParticlesFromFrame();
             if (!success || particles.length === 0) {
                 loaderOverlay.classList.add('hidden');
-                statusDiv.innerText = "⚠️ Failed to extract image, try again";
+                statusDiv.innerText = "⚠️ Failed to generate art, try again";
                 setTimeout(() => {
-                    if(!isArtModeActive) statusDiv.innerText = "🎥 Ready · Point camera at any scene";
+                    if(!isArtModeActive && cameraReady) statusDiv.innerText = "🎥 Ready · Point camera at any scene";
                 }, 1500);
                 return;
             }
             
-            // switch to art mode visuals
             isArtModeActive = true;
             
-            // hide video, show canvas, update buttons
             video.style.opacity = '0';
-            video.style.visibility = 'hidden'; // ensure not visible but stream remains alive
-            // but we keep stream active for reset, but hide element
+            video.style.visibility = 'hidden';
             artCanvas.style.display = 'block';
             artCanvas.style.visibility = 'visible';
             artCanvas.style.opacity = '1';
@@ -480,18 +442,15 @@
             captureBtn.classList.add('hidden');
             resetBtn.classList.remove('hidden');
             
-            // start animation
             startArtAnimation();
             
             loaderOverlay.classList.add('hidden');
-            statusDiv.innerText = "🌀 Living Art · particles flowing through colors";
+            statusDiv.innerText = "🌀 Living Art · particles flowing";
         }
         
-        // ----- reset to camera view -----
         function resetToCamera() {
             if (!isArtModeActive) return;
             
-            // stop animation
             if (animationFrameId) {
                 cancelAnimationFrame(animationFrameId);
                 animationFrameId = null;
@@ -500,132 +459,121 @@
             isArtModeActive = false;
             particles = [];
             
-            // clear canvas
             ctx.clearRect(0, 0, artCanvas.width, artCanvas.height);
             
-            // show video again
             video.style.opacity = '1';
             video.style.visibility = 'visible';
-            artCanvas.style.display = 'block'; // keep canvas hidden but accessible? we hide via visibility? best to let video appear
-            // ensure canvas not visible overlaying
             artCanvas.style.opacity = '0';
-            // but we actually reset visual layers: video visible, canvas invisible
-            // style management
-            video.style.display = 'block';
-            artCanvas.style.display = 'block';
-            artCanvas.style.opacity = '0';
-            video.style.opacity = '1';
             
-            // also ensure video stream is still attached
-            if (currentStream && currentStream.active) {
-                // all good
-            } else {
-                // reinit if needed (in case something weird)
-                initCamera();
-            }
-            
-            // buttons toggle
             captureBtn.classList.remove('hidden');
             resetBtn.classList.add('hidden');
             statusDiv.innerText = "🎥 Camera view · Press 'Capture & Morph'";
         }
         
-        // ----- initialize camera with environment mode for best image -----
         async function initCamera() {
             try {
-                // if stream exists, stop tracks first to avoid multiple streams
-                if (currentStream) {
-                    currentStream.getTracks().forEach(track => track.stop());
-                }
-                const constraints = {
-                    video: {
-                        facingMode: { exact: "environment" },
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    },
-                    audio: false
-                };
+                // First try with basic constraints (most compatible)
+                let stream = null;
+                let permissionGranted = false;
                 
-                // fallback if exact environment fails
-                let stream;
+                // Request with basic video constraint first
                 try {
-                    stream = await navigator.mediaDevices.getUserMedia(constraints);
-                } catch (errEnv) {
-                    console.warn("environment camera failed, using default", errEnv);
-                    stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                    statusDiv.innerText = "📷 Requesting camera permission...";
+                    stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: true,
+                        audio: false 
+                    });
+                    permissionGranted = true;
+                } catch (firstErr) {
+                    console.warn("Basic camera request failed:", firstErr);
+                    statusDiv.innerText = "❌ Camera permission denied. Please allow camera access.";
+                    captureBtn.disabled = true;
+                    captureBtn.style.opacity = '0.5';
+                    return;
                 }
                 
-                currentStream = stream;
-                video.srcObject = stream;
-                video.setAttribute('playsinline', '');
-                await video.play().catch(e => console.warn("play error", e));
-                
-                statusDiv.innerText = "🎥 Live · Point to something colorful";
-                // ensure video metadata loaded and dimensions ready
-                await new Promise(resolve => {
-                    if (video.videoWidth > 0) resolve();
-                    else video.addEventListener('loadedmetadata', () => resolve(), { once: true });
-                });
-                
-                // set initial canvas sizes (but keep adaptive)
-                resizeCanvasToDisplay();
-                artCanvas.style.opacity = '0';
-                video.style.opacity = '1';
-                video.style.visibility = 'visible';
-                artCanvas.style.display = 'block';
+                if (stream) {
+                    if (currentStream) {
+                        currentStream.getTracks().forEach(track => track.stop());
+                    }
+                    currentStream = stream;
+                    video.srcObject = stream;
+                    video.setAttribute('playsinline', '');
+                    
+                    await video.play().catch(e => console.warn("Video play error:", e));
+                    
+                    // Wait for video metadata
+                    await new Promise((resolve) => {
+                        if (video.videoWidth > 0) {
+                            resolve();
+                        } else {
+                            video.addEventListener('loadedmetadata', () => resolve(), { once: true });
+                            setTimeout(resolve, 1000);
+                        }
+                    });
+                    
+                    cameraReady = true;
+                    captureBtn.disabled = false;
+                    captureBtn.style.opacity = '1';
+                    statusDiv.innerText = "🎥 Ready · Point camera at colorful scene";
+                    
+                    resizeCanvasToDisplay();
+                    artCanvas.style.opacity = '0';
+                    video.style.opacity = '1';
+                    video.style.visibility = 'visible';
+                    artCanvas.style.display = 'block';
+                }
             } catch (err) {
-                console.error("Camera error:", err);
-                statusDiv.innerText = "❌ Camera access denied. Please allow permissions.";
+                console.error("Camera initialization error:", err);
+                statusDiv.innerText = "❌ Could not access camera. Please check permissions.";
                 captureBtn.disabled = true;
                 captureBtn.style.opacity = '0.5';
-                captureBtn.style.pointerEvents = 'none';
+                cameraReady = false;
             }
         }
         
-        // ----- window resize handler: adapt canvas and particles when in art mode -----
         function handleResize() {
             if (isArtModeActive) {
                 const newWidth = window.innerWidth;
                 const newHeight = window.innerHeight;
                 if (artCanvas.width !== newWidth || artCanvas.height !== newHeight) {
-                    // rescale canvas but particles will remain with old coordinates, but wrap-around still works.
-                    // to avoid visual gap we adjust coordinate scaling gently? better to keep but no big issue.
                     artCanvas.width = newWidth;
                     artCanvas.height = newHeight;
-                    // no need to recreate particles, they will wrap around new canvas edges gracefully.
                 }
             } else {
                 resizeCanvasToDisplay();
             }
         }
         
-        // ------ event binding -----
+        // Event binding
         captureBtn.addEventListener('click', onCaptureAndCreate);
         resetBtn.addEventListener('click', resetToCamera);
-        window.addEventListener('resize', () => {
-            setTimeout(handleResize, 30);
-        });
+        window.addEventListener('resize', () => setTimeout(handleResize, 50));
         
-        // small improvement: pre-set canvas hidden from view but ready
+        // Setup initial state
         artCanvas.style.opacity = '0';
         video.style.display = 'block';
         artCanvas.style.display = 'block';
+        artCanvas.style.backgroundColor = '#000';
         
-        // start camera
-        initCamera().then(() => {
-            // force status again after camera ready
-            setTimeout(() => {
-                if(!isArtModeActive) statusDiv.innerText = "📸 Ready · Capture to generate living art";
-            }, 500);
-        });
+        // Start camera on page load with user gesture handling for iOS
+        const startCamera = async () => {
+            await initCamera();
+        };
         
-        // optional: preload buffer canvas no-op
-        // additional log for mobile
-        document.body.addEventListener('touchstart', (e) => {
-            // just to enable active CSS, no other effect
-        });
+        // Trigger camera on page load (works in most modern browsers)
+        startCamera();
         
-        // cleanup on page unload to release camera
+        // For extra safety on some mobile browsers, also try on first touch
+        let cameraStarted = false;
+        document.body.addEventListener('touchstart', () => {
+            if (!cameraStarted && !currentStream) {
+                cameraStarted = true;
+                initCamera();
+            }
+        }, { once: true });
+        
+        // Cleanup on page unload
         window.addEventListener('beforeunload', () => {
             if (currentStream) {
                 currentStream.getTracks().forEach(track => track.stop());
@@ -633,11 +581,12 @@
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
         });
         
-        // small style override to ensure video hidden behind canvas in art mode actually
-        // but we manage visibility via style.
-        // initial setup: video visible, canvas hidden
-        artCanvas.style.opacity = '0';
-        video.style.opacity = '1';
+        // Initial status update
+        setTimeout(() => {
+            if (!cameraReady && !currentStream) {
+                statusDiv.innerText = "📱 Tap screen to enable camera";
+            }
+        }, 1000);
     })();
 </script>
 </body>
