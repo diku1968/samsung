@@ -2,230 +2,643 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI Video Art Creator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>PixelFlow | AI Video Art Creator</title>
     <style>
-        :root {
-            --primary: #007AFF;
-            --bg: #000;
-            --text: #fff;
-        }
-
-        body, html {
+        * {
             margin: 0;
             padding: 0;
-            width: 100%;
-            height: 100%;
-            background-color: var(--bg);
-            color: var(--text);
-            font-family: -apple-system, sans-serif;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
 
-        #container {
+        body {
+            background: #000000;
+            font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
+            height: 100dvh;
+            width: 100%;
+            touch-action: pan-x pan-y; /* allow scrolling only if needed, but we lock */
+        }
+
+        /* main container */
+        .app-container {
             position: relative;
             width: 100%;
             height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            background: #000;
+            isolation: isolate;
         }
 
-        video, #artCanvas {
+        /* video & canvas layers */
+        .media-layer {
             position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
             object-fit: cover;
         }
 
-        #artCanvas {
-            display: none;
-            z-index: 10;
+        #video {
+            z-index: 1;
         }
 
-        .ui-overlay {
+        #artCanvas {
+            z-index: 2;
+            display: block;
+        }
+
+        .hidden-canvas {
+            display: none;
+        }
+
+        /* ui overlay */
+        .ui-bar {
             position: absolute;
-            bottom: 40px;
-            width: 100%;
+            bottom: 32px;
+            left: 0;
+            right: 0;
             display: flex;
             justify-content: center;
             gap: 20px;
             z-index: 20;
+            padding: 0 16px;
+            pointer-events: none;
         }
 
         .btn {
-            background: rgba(255, 255, 255, 0.2);
-            backdrop-filter: blur(10px);
-            border: 2px solid #fff;
-            color: #fff;
-            padding: 15px 30px;
-            border-radius: 50px;
-            font-size: 18px;
-            font-weight: bold;
+            pointer-events: auto;
+            background: rgba(20, 20, 30, 0.75);
+            backdrop-filter: blur(16px);
+            border: 1.5px solid rgba(255, 255, 255, 0.65);
+            color: white;
+            padding: 14px 28px;
+            border-radius: 60px;
+            font-size: 1rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
             cursor: pointer;
-            transition: transform 0.2s;
+            transition: all 0.2s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+            font-family: inherit;
             text-transform: uppercase;
         }
 
-        .btn:active { transform: scale(0.95); }
-        .btn-capture { background: var(--primary); border-color: var(--primary); }
-        .hidden { display: none !important; }
+        .btn-primary {
+            background: #007AFF;
+            border-color: #ffffffcc;
+            box-shadow: 0 4px 14px rgba(0, 122, 255, 0.3);
+        }
 
-        #status {
+        .btn-primary:active {
+            transform: scale(0.96);
+            background: #005fc1;
+        }
+
+        .btn-secondary {
+            background: rgba(0, 0, 0, 0.6);
+            border-color: rgba(255, 255, 255, 0.9);
+        }
+
+        .btn-secondary:active {
+            transform: scale(0.96);
+            background: rgba(50, 50, 70, 0.8);
+        }
+
+        /* status & loader */
+        .status-area {
             position: absolute;
             top: 20px;
-            width: 100%;
+            left: 0;
+            right: 0;
             text-align: center;
-            opacity: 0.7;
-            z-index: 20;
+            z-index: 25;
+            font-size: 14px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.9);
+            text-shadow: 0 1px 4px black;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(4px);
+            width: fit-content;
+            margin: 0 auto;
+            padding: 8px 20px;
+            border-radius: 40px;
+            letter-spacing: 0.3px;
+            pointer-events: none;
+        }
+
+        .loader {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 30;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(12px);
+            padding: 20px 24px;
+            border-radius: 60px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(255,255,255,0.2);
+            pointer-events: none;
+        }
+
+        .spinner {
+            width: 28px;
+            height: 28px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top: 3px solid white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .loader-text {
+            color: white;
+            font-size: 1rem;
+            font-weight: 500;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* subtle vignette overlay for camera style */
+        .vignette {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at center, transparent 60%, rgba(0,0,0,0.3) 100%);
+            z-index: 3;
+            pointer-events: none;
+        }
+
+        @media (max-width: 640px) {
+            .btn { padding: 10px 20px; font-size: 0.85rem; }
+            .status-area { font-size: 12px; top: 12px; padding: 6px 16px; }
         }
     </style>
 </head>
 <body>
+<div class="app-container">
+    <video id="video" class="media-layer" autoplay playsinline muted></video>
+    <canvas id="artCanvas" class="media-layer"></canvas>
+    <div class="vignette"></div>
 
-    <div id="status">Requesting Camera...</div>
+    <div id="statusMessage" class="status-area">✨ Ready · Point camera at any scene</div>
 
-    <div id="container">
-        <video id="video" autoplay playsinline muted></video>
-        <canvas id="artCanvas"></canvas>
+    <div id="loaderOverlay" class="loader hidden">
+        <div class="spinner"></div>
+        <span class="loader-text">Generating AI art flow...</span>
     </div>
 
-    <div class="ui-overlay">
-        <button id="captureBtn" class="btn btn-capture">Capture & Create Art</button>
-        <button id="resetBtn" class="btn hidden">Reset Camera</button>
+    <div class="ui-bar">
+        <button id="captureBtn" class="btn btn-primary">✨ Capture & Morph</button>
+        <button id="resetBtn" class="btn btn-secondary hidden">⟳ Reset Camera</button>
     </div>
+</div>
 
-    <canvas id="bufferCanvas" style="display:none;"></canvas>
+<canvas id="bufferCanvas" class="hidden-canvas"></canvas>
 
-    <script>
+<script>
+    (function(){
+        // ----- DOM elements -----
         const video = document.getElementById('video');
         const artCanvas = document.getElementById('artCanvas');
         const bufferCanvas = document.getElementById('bufferCanvas');
         const captureBtn = document.getElementById('captureBtn');
         const resetBtn = document.getElementById('resetBtn');
-        const statusText = document.getElementById('status');
+        const statusDiv = document.getElementById('statusMessage');
+        const loaderOverlay = document.getElementById('loaderOverlay');
 
         const ctx = artCanvas.getContext('2d');
         const bufferCtx = bufferCanvas.getContext('2d');
 
+        // ----- state -----
         let particles = [];
-        let animationId = null;
-        let isArtMode = false;
+        let animationFrameId = null;
+        let isArtModeActive = false;
+        let currentStream = null;
 
-        const PARTICLE_DENSITY = 8; 
-        const SPEED_FACTOR = 0.5;
-
-        class Particle {
-            constructor(x, y, color) {
-                this.x = x;
-                this.y = y;
-                this.color = color;
-                this.size = Math.random() * 2 + 1;
-                this.vx = (Math.random() - 0.5) * SPEED_FACTOR;
-                this.vy = (Math.random() - 0.5) * SPEED_FACTOR;
-                this.angle = Math.random() * Math.PI * 2;
-            }
-
-            update() {
-                this.angle += 0.02;
-                this.vx += Math.cos(this.angle) * 0.02;
-                this.vy += Math.sin(this.angle) * 0.02;
-                this.x += this.vx;
-                this.y += this.vy;
-
-                if (this.x < 0) this.x = artCanvas.width;
-                if (this.x > artCanvas.width) this.x = 0;
-                if (this.y < 0) this.y = artCanvas.height;
-                if (this.y > artCanvas.height) this.y = 0;
-            }
-
-            draw() {
-                ctx.fillStyle = this.color;
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        }
-
-        async function initCamera() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'environment' },
-                    audio: false
-                });
-                video.srcObject = stream;
-                // Important: Ensure video starts playing
-                video.onloadedmetadata = () => {
-                    video.play();
-                    statusText.innerText = "Camera Ready - Point at something colorful!";
-                };
-            } catch (err) {
-                statusText.innerText = "Camera Error: " + err.message;
-            }
-        }
-
-        function captureImage() {
-            if (video.videoWidth === 0) return;
-
-            isArtMode = true;
-            statusText.innerText = "Generating Art...";
-
-            artCanvas.width = window.innerWidth;
-            artCanvas.height = window.innerHeight;
-            bufferCanvas.width = video.videoWidth;
-            bufferCanvas.height = video.videoHeight;
-
-            bufferCtx.drawImage(video, 0, 0);
-            const imageData = bufferCtx.getImageData(0, 0, bufferCanvas.width, bufferCanvas.height);
-            const data = imageData.data;
-
-            particles = [];
-            const scaleX = artCanvas.width / bufferCanvas.width;
-            const scaleY = artCanvas.height / bufferCanvas.height;
-
-            for (let y = 0; y < bufferCanvas.height; y += PARTICLE_DENSITY) {
-                for (let x = 0; x < bufferCanvas.width; x += PARTICLE_DENSITY) {
-                    const index = (y * bufferCanvas.width + x) * 4;
-                    if (data[index + 3] > 128) {
-                        const color = `rgb(${data[index]},${data[index+1]},${data[index+2]})`;
-                        particles.push(new Particle(x * scaleX, y * scaleY, color));
-                    }
+        // art parameters - elegant swarm
+        const PARTICLE_SAMPLE_STEP = 8;        // step 8px for good density/performance
+        const BASE_SPEED = 0.42;
+        const TRAIL_FADE = 0.06;               // smooth motion trail
+        
+        // ----- helper: update canvas dimensions on resize -----
+        function resizeCanvasToDisplay() {
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            if (!isArtModeActive) {
+                // just keep canvas dimensions for future
+                artCanvas.width = w;
+                artCanvas.height = h;
+            } else {
+                // during art mode, preserve existing particles but adjust? we don't reposition but we avoid glitches
+                // we keep previous dimensions to avoid chaos; we only adjust when resetting or during init capture.
+                // but we update for consistency.
+                if(artCanvas.width !== w || artCanvas.height !== h) {
+                    // if dimensions changed while animating, we recreate dimensions (scale will cause shift but reset is smoother).
+                    // better to just preserve old dimensions, but we resize context to avoid distortion.
+                    // However repaint will adapt new dimensions for new particles when recaptured. So we only update during capture.
+                    // but we don't want clipping -> we set new size but particles coordinates remain relative to old size, will be off.
+                    // to keep smooth: resize canvas but do NOT remap particles -> they might go outside, but wrap-around logic works.
+                    artCanvas.width = w;
+                    artCanvas.height = h;
                 }
             }
+        }
 
-            video.style.display = 'none';
+        // ----- particle class with elegant fluid motion, color & soft glow -----
+        class ParticleFlow {
+            constructor(x, y, colorRgb) {
+                this.x = x;
+                this.y = y;
+                this.originX = x;
+                this.originY = y;
+                this.color = colorRgb;   // store rgba string
+                this.size = Math.random() * 2.4 + 1.2;   // 1.2 - 3.6px, organic
+                // smooth velocity with gentle drift
+                this.vx = (Math.random() - 0.5) * BASE_SPEED * 1.2;
+                this.vy = (Math.random() - 0.5) * BASE_SPEED * 1.2;
+                this.angle = Math.random() * Math.PI * 2;
+                this.phase = Math.random() * Math.PI * 2;
+                this.noiseSpeed = 0.008 + Math.random() * 0.01;
+            }
+
+            update(width, height) {
+                // organic sinusoidal flow + gentle random walk
+                this.angle += 0.012;
+                const driftX = Math.sin(this.angle * 0.7) * 0.12;
+                const driftY = Math.cos(this.angle * 0.5) * 0.12;
+                
+                // subtle noise influence
+                this.vx += driftX + (Math.random() - 0.5) * 0.08;
+                this.vy += driftY + (Math.random() - 0.5) * 0.08;
+                
+                // damping to keep smooth but lively
+                this.vx *= 0.99;
+                this.vy *= 0.99;
+                
+                // limit speed so particles don't blast away drastically
+                const maxSpeed = 2.2;
+                this.vx = Math.min(maxSpeed, Math.max(-maxSpeed, this.vx));
+                this.vy = Math.min(maxSpeed, Math.max(-maxSpeed, this.vy));
+                
+                this.x += this.vx;
+                this.y += this.vy;
+                
+                // wrap-around with edges (create infinite canvas feeling)
+                if (this.x < 0) this.x = width;
+                if (this.x > width) this.x = 0;
+                if (this.y < 0) this.y = height;
+                if (this.y > height) this.y = 0;
+            }
+
+            draw(ctx) {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                // use fill style with slight transparency for glow-like blending
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                // optional tiny inner highlight for some magic
+                if(this.size > 1.8) {
+                    ctx.beginPath();
+                    ctx.arc(this.x-0.5, this.y-0.5, this.size*0.25, 0, Math.PI*2);
+                    ctx.fillStyle = 'rgba(255,255,200,0.3)';
+                    ctx.fill();
+                }
+            }
+        }
+
+        // ----- generate particles from captured video frame (deep color sampling) -----
+        function generateParticlesFromFrame() {
+            // ensure buffer dimensions match video source
+            const videoWidth = video.videoWidth;
+            const videoHeight = video.videoHeight;
+            
+            if (videoWidth === 0 || videoHeight === 0) {
+                console.warn("Video dimensions not ready");
+                return false;
+            }
+            
+            // set buffer canvas to exact video frame size
+            bufferCanvas.width = videoWidth;
+            bufferCanvas.height = videoHeight;
+            
+            // draw current video frame onto buffer
+            bufferCtx.drawImage(video, 0, 0, videoWidth, videoHeight);
+            
+            // get pixel data
+            let imageData;
+            try {
+                imageData = bufferCtx.getImageData(0, 0, videoWidth, videoHeight);
+            } catch(e) {
+                console.error("getImageData failed", e);
+                return false;
+            }
+            
+            const data = imageData.data;
+            
+            // define target canvas dimensions (full screen)
+            const targetW = window.innerWidth;
+            const targetH = window.innerHeight;
+            artCanvas.width = targetW;
+            artCanvas.height = targetH;
+            
+            const scaleX = targetW / videoWidth;
+            const scaleY = targetH / videoHeight;
+            
+            const newParticles = [];
+            const step = PARTICLE_SAMPLE_STEP;
+            
+            // sample pixels, limit max particles for performance (still rich)
+            let maxParticlesLimit = 18000;
+            let particleCount = 0;
+            
+            for (let y = 0; y < videoHeight; y += step) {
+                for (let x = 0; x < videoWidth; x += step) {
+                    if (particleCount > maxParticlesLimit) break;
+                    const idx = (y * videoWidth + x) * 4;
+                    const r = data[idx];
+                    const g = data[idx+1];
+                    const b = data[idx+2];
+                    const a = data[idx+3];
+                    
+                    // skip nearly transparent & very dark areas optionally but keep richness
+                    if (a > 40 && (r+g+b > 30)) {
+                        // preserve original vibrant color, slight alpha blending for particle clouds
+                        const alphaFactor = 0.85;
+                        const colorStr = `rgba(${r}, ${g}, ${b}, ${alphaFactor})`;
+                        const px = x * scaleX + (Math.random() * 1.5 - 0.75);
+                        const py = y * scaleY + (Math.random() * 1.5 - 0.75);
+                        newParticles.push(new ParticleFlow(px, py, colorStr));
+                        particleCount++;
+                    } else if ((r+g+b) > 20) {
+                        // also include mid-low brightness with slight opacity
+                        const colorStr = `rgba(${r}, ${g}, ${b}, 0.7)`;
+                        const px = x * scaleX;
+                        const py = y * scaleY;
+                        newParticles.push(new ParticleFlow(px, py, colorStr));
+                        particleCount++;
+                    }
+                }
+                if (particleCount > maxParticlesLimit) break;
+            }
+            
+            // if particle count is too low for interesting visuals (e.g. dark scene), we add subtle halos
+            if (newParticles.length < 800) {
+                // fill small amount of extra decorative particles based on predominant colors
+                for (let i = 0; i < 600; i++) {
+                    const randX = Math.random() * targetW;
+                    const randY = Math.random() * targetH;
+                    const randCol = `rgba(180, 200, 255, 0.5)`;
+                    newParticles.push(new ParticleFlow(randX, randY, randCol));
+                }
+            }
+            
+            particles = newParticles;
+            return true;
+        }
+        
+        // ----- animation loop with trail & motion blur effect -----
+        function startArtAnimation() {
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            
+            const w = artCanvas.width;
+            const h = artCanvas.height;
+            
+            function drawFrame() {
+                if (!isArtModeActive) return;
+                
+                // clear canvas with soft fade trail (creates motion blur / afterglow)
+                ctx.fillStyle = `rgba(0, 0, 0, ${TRAIL_FADE})`;
+                ctx.fillRect(0, 0, artCanvas.width, artCanvas.height);
+                
+                // update and draw all particles
+                const currentW = artCanvas.width;
+                const currentH = artCanvas.height;
+                for (let p of particles) {
+                    p.update(currentW, currentH);
+                    p.draw(ctx);
+                }
+                
+                animationFrameId = requestAnimationFrame(drawFrame);
+            }
+            
+            drawFrame();
+        }
+        
+        // ----- capture image and transition to art mode -----
+        async function onCaptureAndCreate() {
+            if (isArtModeActive) return;
+            
+            // verify video is ready
+            if (!video.videoWidth || !video.videoHeight) {
+                statusDiv.innerText = "⚠️ Camera not ready, try again";
+                setTimeout(() => {
+                    if(!isArtModeActive) statusDiv.innerText = "🎥 Ready · Point camera at any scene";
+                }, 1500);
+                return;
+            }
+            
+            // show loading overlay
+            loaderOverlay.classList.remove('hidden');
+            statusDiv.innerText = "🎨 AI analyzing pixels & creating particle swarm...";
+            
+            // slight delay to ensure UI update & frame stability
+            await new Promise(r => setTimeout(r, 50));
+            
+            const success = generateParticlesFromFrame();
+            if (!success || particles.length === 0) {
+                loaderOverlay.classList.add('hidden');
+                statusDiv.innerText = "⚠️ Failed to extract image, try again";
+                setTimeout(() => {
+                    if(!isArtModeActive) statusDiv.innerText = "🎥 Ready · Point camera at any scene";
+                }, 1500);
+                return;
+            }
+            
+            // switch to art mode visuals
+            isArtModeActive = true;
+            
+            // hide video, show canvas, update buttons
+            video.style.opacity = '0';
+            video.style.visibility = 'hidden'; // ensure not visible but stream remains alive
+            // but we keep stream active for reset, but hide element
             artCanvas.style.display = 'block';
+            artCanvas.style.visibility = 'visible';
+            artCanvas.style.opacity = '1';
+            
             captureBtn.classList.add('hidden');
             resetBtn.classList.remove('hidden');
-
-            animate();
+            
+            // start animation
+            startArtAnimation();
+            
+            loaderOverlay.classList.add('hidden');
+            statusDiv.innerText = "🌀 Living Art · particles flowing through colors";
         }
-
-        function animate() {
-            if (!isArtMode) return;
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
-            ctx.fillRect(0, 0, artCanvas.width, artCanvas.height);
-            particles.forEach(p => { p.update(); p.draw(); });
-            animationId = requestAnimationFrame(animate);
-        }
-
-        function reset() {
-            isArtMode = false;
-            cancelAnimationFrame(animationId);
+        
+        // ----- reset to camera view -----
+        function resetToCamera() {
+            if (!isArtModeActive) return;
+            
+            // stop animation
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            
+            isArtModeActive = false;
+            particles = [];
+            
+            // clear canvas
+            ctx.clearRect(0, 0, artCanvas.width, artCanvas.height);
+            
+            // show video again
+            video.style.opacity = '1';
+            video.style.visibility = 'visible';
+            artCanvas.style.display = 'block'; // keep canvas hidden but accessible? we hide via visibility? best to let video appear
+            // ensure canvas not visible overlaying
+            artCanvas.style.opacity = '0';
+            // but we actually reset visual layers: video visible, canvas invisible
+            // style management
             video.style.display = 'block';
-            artCanvas.style.display = 'none';
+            artCanvas.style.display = 'block';
+            artCanvas.style.opacity = '0';
+            video.style.opacity = '1';
+            
+            // also ensure video stream is still attached
+            if (currentStream && currentStream.active) {
+                // all good
+            } else {
+                // reinit if needed (in case something weird)
+                initCamera();
+            }
+            
+            // buttons toggle
             captureBtn.classList.remove('hidden');
             resetBtn.classList.add('hidden');
-            statusText.innerText = "Camera Active";
+            statusDiv.innerText = "🎥 Camera view · Press 'Capture & Morph'";
         }
-
-        captureBtn.addEventListener('click', captureImage);
-        resetBtn.addEventListener('click', reset);
-        initCamera();
-    </script>
+        
+        // ----- initialize camera with environment mode for best image -----
+        async function initCamera() {
+            try {
+                // if stream exists, stop tracks first to avoid multiple streams
+                if (currentStream) {
+                    currentStream.getTracks().forEach(track => track.stop());
+                }
+                const constraints = {
+                    video: {
+                        facingMode: { exact: "environment" },
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    },
+                    audio: false
+                };
+                
+                // fallback if exact environment fails
+                let stream;
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia(constraints);
+                } catch (errEnv) {
+                    console.warn("environment camera failed, using default", errEnv);
+                    stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                }
+                
+                currentStream = stream;
+                video.srcObject = stream;
+                video.setAttribute('playsinline', '');
+                await video.play().catch(e => console.warn("play error", e));
+                
+                statusDiv.innerText = "🎥 Live · Point to something colorful";
+                // ensure video metadata loaded and dimensions ready
+                await new Promise(resolve => {
+                    if (video.videoWidth > 0) resolve();
+                    else video.addEventListener('loadedmetadata', () => resolve(), { once: true });
+                });
+                
+                // set initial canvas sizes (but keep adaptive)
+                resizeCanvasToDisplay();
+                artCanvas.style.opacity = '0';
+                video.style.opacity = '1';
+                video.style.visibility = 'visible';
+                artCanvas.style.display = 'block';
+            } catch (err) {
+                console.error("Camera error:", err);
+                statusDiv.innerText = "❌ Camera access denied. Please allow permissions.";
+                captureBtn.disabled = true;
+                captureBtn.style.opacity = '0.5';
+                captureBtn.style.pointerEvents = 'none';
+            }
+        }
+        
+        // ----- window resize handler: adapt canvas and particles when in art mode -----
+        function handleResize() {
+            if (isArtModeActive) {
+                const newWidth = window.innerWidth;
+                const newHeight = window.innerHeight;
+                if (artCanvas.width !== newWidth || artCanvas.height !== newHeight) {
+                    // rescale canvas but particles will remain with old coordinates, but wrap-around still works.
+                    // to avoid visual gap we adjust coordinate scaling gently? better to keep but no big issue.
+                    artCanvas.width = newWidth;
+                    artCanvas.height = newHeight;
+                    // no need to recreate particles, they will wrap around new canvas edges gracefully.
+                }
+            } else {
+                resizeCanvasToDisplay();
+            }
+        }
+        
+        // ------ event binding -----
+        captureBtn.addEventListener('click', onCaptureAndCreate);
+        resetBtn.addEventListener('click', resetToCamera);
+        window.addEventListener('resize', () => {
+            setTimeout(handleResize, 30);
+        });
+        
+        // small improvement: pre-set canvas hidden from view but ready
+        artCanvas.style.opacity = '0';
+        video.style.display = 'block';
+        artCanvas.style.display = 'block';
+        
+        // start camera
+        initCamera().then(() => {
+            // force status again after camera ready
+            setTimeout(() => {
+                if(!isArtModeActive) statusDiv.innerText = "📸 Ready · Capture to generate living art";
+            }, 500);
+        });
+        
+        // optional: preload buffer canvas no-op
+        // additional log for mobile
+        document.body.addEventListener('touchstart', (e) => {
+            // just to enable active CSS, no other effect
+        });
+        
+        // cleanup on page unload to release camera
+        window.addEventListener('beforeunload', () => {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+            }
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+        });
+        
+        // small style override to ensure video hidden behind canvas in art mode actually
+        // but we manage visibility via style.
+        // initial setup: video visible, canvas hidden
+        artCanvas.style.opacity = '0';
+        video.style.opacity = '1';
+    })();
+</script>
 </body>
 </html>
