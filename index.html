@@ -181,6 +181,25 @@
             pointer-events: none;
         }
 
+        /* Manual camera trigger overlay for better UX */
+        .camera-trigger {
+            position: absolute;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 15;
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            white-space: nowrap;
+        }
+
         @media (max-width: 640px) {
             .btn { padding: 10px 20px; font-size: 0.85rem; }
             .status-area { font-size: 12px; top: 12px; padding: 6px 16px; }
@@ -195,7 +214,7 @@
     <canvas id="artCanvas" class="media-layer"></canvas>
     <div class="vignette"></div>
 
-    <div id="statusMessage" class="status-area">📷 Requesting camera access...</div>
+    <div id="statusMessage" class="status-area">📷 Tap "Enable Camera" to start</div>
 
     <div id="loaderOverlay" class="loader hidden">
         <div class="spinner"></div>
@@ -230,6 +249,7 @@
         let isArtModeActive = false;
         let currentStream = null;
         let cameraReady = false;
+        let cameraAttempted = false;
 
         // Art parameters
         const PARTICLE_SAMPLE_STEP = 8;
@@ -403,9 +423,10 @@
         async function onCaptureAndCreate() {
             if (isArtModeActive || !cameraReady) {
                 if (!cameraReady) {
-                    statusDiv.innerText = "⚠️ Camera not ready yet, please wait...";
+                    statusDiv.innerText = "⚠️ Please enable camera first";
                     setTimeout(() => {
                         if(!isArtModeActive && cameraReady) statusDiv.innerText = "🎥 Ready · Point camera at any scene";
+                        else if(!isArtModeActive && !cameraReady) statusDiv.innerText = "📷 Tap 'Enable Camera' to start";
                     }, 2000);
                 }
                 return;
@@ -471,64 +492,83 @@
         }
         
         async function initCamera() {
+            if (cameraAttempted) return;
+            cameraAttempted = true;
+            
             try {
-                // First try with basic constraints (most compatible)
-                let stream = null;
-                let permissionGranted = false;
+                statusDiv.innerText = "📷 Accessing camera...";
                 
-                // Request with basic video constraint first
-                try {
-                    statusDiv.innerText = "📷 Requesting camera permission...";
-                    stream = await navigator.mediaDevices.getUserMedia({ 
-                        video: true,
-                        audio: false 
-                    });
-                    permissionGranted = true;
-                } catch (firstErr) {
-                    console.warn("Basic camera request failed:", firstErr);
-                    statusDiv.innerText = "❌ Camera permission denied. Please allow camera access.";
-                    captureBtn.disabled = true;
-                    captureBtn.style.opacity = '0.5';
-                    return;
+                // Set a timeout to prevent infinite waiting
+                const cameraPromise = navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    },
+                    audio: false 
+                });
+                
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error("Camera request timeout")), 5000)
+                );
+                
+                const stream = await Promise.race([cameraPromise, timeoutPromise]);
+                
+                if (currentStream) {
+                    currentStream.getTracks().forEach(track => track.stop());
                 }
+                currentStream = stream;
+                video.srcObject = stream;
+                video.setAttribute('playsinline', '');
                 
-                if (stream) {
-                    if (currentStream) {
-                        currentStream.getTracks().forEach(track => track.stop());
-                    }
-                    currentStream = stream;
-                    video.srcObject = stream;
-                    video.setAttribute('playsinline', '');
-                    
-                    await video.play().catch(e => console.warn("Video play error:", e));
-                    
-                    // Wait for video metadata
-                    await new Promise((resolve) => {
-                        if (video.videoWidth > 0) {
+                await video.play();
+                
+                // Wait for video to have dimensions
+                await new Promise((resolve) => {
+                    if (video.videoWidth > 0) {
+                        resolve();
+                    } else {
+                        const checkInterval = setInterval(() => {
+                            if (video.videoWidth > 0) {
+                                clearInterval(checkInterval);
+                                resolve();
+                            }
+                        }, 50);
+                        setTimeout(() => {
+                            clearInterval(checkInterval);
                             resolve();
-                        } else {
-                            video.addEventListener('loadedmetadata', () => resolve(), { once: true });
-                            setTimeout(resolve, 1000);
-                        }
-                    });
-                    
-                    cameraReady = true;
-                    captureBtn.disabled = false;
-                    captureBtn.style.opacity = '1';
-                    statusDiv.innerText = "🎥 Ready · Point camera at colorful scene";
-                    
-                    resizeCanvasToDisplay();
-                    artCanvas.style.opacity = '0';
-                    video.style.opacity = '1';
-                    video.style.visibility = 'visible';
-                    artCanvas.style.display = 'block';
-                }
+                        }, 2000);
+                    }
+                });
+                
+                cameraReady = true;
+                captureBtn.disabled = false;
+                captureBtn.style.opacity = '1';
+                statusDiv.innerText = "🎥 Ready! Point at something colorful";
+                
+                resizeCanvasToDisplay();
+                artCanvas.style.opacity = '0';
+                video.style.opacity = '1';
+                video.style.visibility = 'visible';
+                artCanvas.style.display = 'block';
+                
             } catch (err) {
-                console.error("Camera initialization error:", err);
-                statusDiv.innerText = "❌ Could not access camera. Please check permissions.";
+                console.error("Camera error:", err);
+                statusDiv.innerText = "❌ Camera access failed. Please check permissions.";
                 captureBtn.disabled = true;
-                captureBtn.style.opacity = '0.5';
                 cameraReady = false;
+                cameraAttempted = false;
+                
+                // Add retry button
+                const retryBtn = document.createElement('button');
+                retryBtn.textContent = '🔄 Retry Camera';
+                retryBtn.className = 'camera-trigger';
+                retryBtn.onclick = () => {
+                    retryBtn.remove();
+                    cameraAttempted = false;
+                    initCamera();
+                };
+                document.querySelector('.app-container').appendChild(retryBtn);
+                setTimeout(() => retryBtn.remove(), 5000);
             }
         }
         
@@ -545,6 +585,19 @@
             }
         }
         
+        // Create manual camera trigger button
+        const createCameraTrigger = () => {
+            const triggerBtn = document.createElement('button');
+            triggerBtn.textContent = '🎥 Enable Camera';
+            triggerBtn.className = 'camera-trigger';
+            triggerBtn.onclick = () => {
+                triggerBtn.remove();
+                initCamera();
+            };
+            document.querySelector('.app-container').appendChild(triggerBtn);
+            return triggerBtn;
+        };
+        
         // Event binding
         captureBtn.addEventListener('click', onCaptureAndCreate);
         resetBtn.addEventListener('click', resetToCamera);
@@ -556,37 +609,29 @@
         artCanvas.style.display = 'block';
         artCanvas.style.backgroundColor = '#000';
         
-        // Start camera on page load with user gesture handling for iOS
-        const startCamera = async () => {
-            await initCamera();
-        };
-        
-        // Trigger camera on page load (works in most modern browsers)
-        startCamera();
-        
-        // For extra safety on some mobile browsers, also try on first touch
-        let cameraStarted = false;
-        document.body.addEventListener('touchstart', () => {
-            if (!cameraStarted && !currentStream) {
-                cameraStarted = true;
-                initCamera();
+        // Try to auto-start camera, but show manual button if it takes too long
+        const autoStartTimeout = setTimeout(() => {
+            if (!cameraReady && !cameraAttempted) {
+                statusDiv.innerText = "📱 Tap 'Enable Camera' to start";
+                createCameraTrigger();
             }
-        }, { once: true });
+        }, 1000);
         
-        // Cleanup on page unload
+        // Auto attempt camera (works if page has permission or auto-grant)
+        initCamera().catch(() => {
+            clearTimeout(autoStartTimeout);
+            if (!cameraReady) {
+                createCameraTrigger();
+            }
+        });
+        
+        // Cleanup
         window.addEventListener('beforeunload', () => {
             if (currentStream) {
                 currentStream.getTracks().forEach(track => track.stop());
             }
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
         });
-        
-        // Initial status update
-        setTimeout(() => {
-            if (!cameraReady && !currentStream) {
-                statusDiv.innerText = "📱 Tap screen to enable camera";
-            }
-        }, 1000);
     })();
 </script>
 </body>
