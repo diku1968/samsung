@@ -2,637 +2,300 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>PixelFlow | AI Video Art Creator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI Video Art Creator</title>
     <style>
-        * {
+        :root {
+            --primary: #007AFF;
+            --bg: #000;
+            --text: #fff;
+        }
+
+        body, html {
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        body {
-            background: #000000;
-            font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            overflow: hidden;
-            height: 100dvh;
             width: 100%;
+            height: 100%;
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
 
-        .app-container {
+        #container {
             position: relative;
             width: 100%;
             height: 100%;
-            background: #000;
-            isolation: isolate;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
 
-        .media-layer {
+        video, canvas {
             position: absolute;
-            top: 0;
-            left: 0;
             width: 100%;
             height: 100%;
             object-fit: cover;
         }
 
-        #video {
-            z-index: 1;
-        }
-
         #artCanvas {
-            z-index: 2;
-            display: block;
-        }
-
-        .hidden-canvas {
             display: none;
+            z-index: 10;
         }
 
-        .ui-bar {
+        .ui-overlay {
             position: absolute;
-            bottom: 32px;
+            bottom: 40px;
             left: 0;
-            right: 0;
+            width: 100%;
             display: flex;
             justify-content: center;
             gap: 20px;
             z-index: 20;
-            padding: 0 16px;
-            pointer-events: none;
         }
 
         .btn {
-            pointer-events: auto;
-            background: rgba(20, 20, 30, 0.85);
-            backdrop-filter: blur(16px);
-            border: 1.5px solid rgba(255, 255, 255, 0.7);
-            color: white;
-            padding: 14px 28px;
-            border-radius: 60px;
-            font-size: 1rem;
-            font-weight: 600;
-            letter-spacing: 0.5px;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            border: 2px solid #fff;
+            color: #fff;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 18px;
+            font-weight: bold;
             cursor: pointer;
-            transition: all 0.2s cubic-bezier(0.2, 0.9, 0.4, 1.1);
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
-            font-family: inherit;
+            transition: transform 0.2s, background 0.2s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
-        .btn-primary {
-            background: #007AFF;
-            border-color: #ffffffcc;
-            box-shadow: 0 4px 14px rgba(0, 122, 255, 0.3);
+        .btn:active {
+            transform: scale(0.95);
+            background: rgba(255, 255, 255, 0.4);
         }
 
-        .btn-primary:active {
-            transform: scale(0.96);
-            background: #005fc1;
+        .btn-capture {
+            background: var(--primary);
+            border-color: var(--primary);
         }
 
-        .btn-secondary {
-            background: rgba(0, 0, 0, 0.7);
-            border-color: rgba(255, 255, 255, 0.9);
-        }
-
-        .btn-secondary:active {
-            transform: scale(0.96);
-            background: rgba(50, 50, 70, 0.8);
-        }
-
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .status-area {
+        #status {
             position: absolute;
             top: 20px;
-            left: 0;
-            right: 0;
+            width: 100%;
             text-align: center;
-            z-index: 25;
             font-size: 14px;
-            font-weight: 500;
-            color: rgba(255, 255, 255, 0.95);
-            text-shadow: 0 1px 4px black;
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(8px);
-            width: fit-content;
-            margin: 0 auto;
-            padding: 8px 20px;
-            border-radius: 40px;
-            letter-spacing: 0.3px;
+            opacity: 0.7;
+            z-index: 20;
             pointer-events: none;
-            transition: opacity 0.3s;
-        }
-
-        .loader {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 30;
-            background: rgba(0, 0, 0, 0.85);
-            backdrop-filter: blur(12px);
-            padding: 20px 28px;
-            border-radius: 60px;
-            display: flex;
-            gap: 14px;
-            align-items: center;
-            justify-content: center;
-            border: 1px solid rgba(255,255,255,0.2);
-            pointer-events: none;
-        }
-
-        .spinner {
-            width: 28px;
-            height: 28px;
-            border: 3px solid rgba(255,255,255,0.3);
-            border-top: 3px solid white;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-
-        .loader-text {
-            color: white;
-            font-size: 1rem;
-            font-weight: 500;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
         }
 
         .hidden {
             display: none !important;
         }
 
-        .vignette {
+        /* Loading Spinner */
+        #loader {
             position: absolute;
-            inset: 0;
-            background: radial-gradient(circle at center, transparent 60%, rgba(0,0,0,0.25) 100%);
-            z-index: 3;
-            pointer-events: none;
+            z-index: 30;
+            display: none;
         }
-
-        /* Manual camera trigger overlay for better UX */
-        .camera-trigger {
-            position: absolute;
-            bottom: 120px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 15;
-            background: #007AFF;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 50px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            white-space: nowrap;
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255,255,255,0.3);
+            border-top: 5px solid #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
         }
-
-        @media (max-width: 640px) {
-            .btn { padding: 10px 20px; font-size: 0.85rem; }
-            .status-area { font-size: 12px; top: 12px; padding: 6px 16px; }
-            .loader { padding: 14px 22px; }
-            .loader-text { font-size: 0.9rem; }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
-<div class="app-container">
-    <video id="video" class="media-layer" autoplay playsinline muted></video>
-    <canvas id="artCanvas" class="media-layer"></canvas>
-    <div class="vignette"></div>
 
-    <div id="statusMessage" class="status-area">📷 Tap "Enable Camera" to start</div>
+    <div id="status">Pointing to an image...</div>
 
-    <div id="loaderOverlay" class="loader hidden">
-        <div class="spinner"></div>
-        <span class="loader-text">Creating particle art...</span>
+    <div id="container">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="artCanvas"></canvas>
+        <div id="loader"><div class="spinner"></div></div>
     </div>
 
-    <div class="ui-bar">
-        <button id="captureBtn" class="btn btn-primary" disabled>✨ Capture & Morph</button>
-        <button id="resetBtn" class="btn btn-secondary hidden">⟳ Reset Camera</button>
+    <div class="ui-overlay">
+        <button id="captureBtn" class="btn btn-capture">Capture & Create Art</button>
+        <button id="resetBtn" class="btn hidden">Reset Camera</button>
     </div>
-</div>
 
-<canvas id="bufferCanvas" class="hidden-canvas"></canvas>
+    <!-- Hidden canvas for pixel extraction -->
+    <canvas id="bufferCanvas" style="display:none;"></canvas>
 
-<script>
-    (function(){
-        // DOM elements
+    <script>
         const video = document.getElementById('video');
         const artCanvas = document.getElementById('artCanvas');
         const bufferCanvas = document.getElementById('bufferCanvas');
         const captureBtn = document.getElementById('captureBtn');
         const resetBtn = document.getElementById('resetBtn');
-        const statusDiv = document.getElementById('statusMessage');
-        const loaderOverlay = document.getElementById('loaderOverlay');
+        const statusText = document.getElementById('status');
+        const loader = document.getElementById('loader');
 
         const ctx = artCanvas.getContext('2d');
         const bufferCtx = bufferCanvas.getContext('2d');
 
-        // State
         let particles = [];
-        let animationFrameId = null;
-        let isArtModeActive = false;
-        let currentStream = null;
-        let cameraReady = false;
-        let cameraAttempted = false;
+        let animationId = null;
+        let isArtMode = false;
 
-        // Art parameters
-        const PARTICLE_SAMPLE_STEP = 8;
-        const BASE_SPEED = 0.42;
-        const TRAIL_FADE = 0.06;
+        // Configuration
+        const PARTICLE_DENSITY = 10; // Sample every N pixels
+        const SPEED_FACTOR = 0.5;
 
-        function resizeCanvasToDisplay() {
-            const w = window.innerWidth;
-            const h = window.innerHeight;
-            if (!isArtModeActive) {
-                artCanvas.width = w;
-                artCanvas.height = h;
-            } else {
-                if(artCanvas.width !== w || artCanvas.height !== h) {
-                    artCanvas.width = w;
-                    artCanvas.height = h;
-                }
-            }
-        }
-
-        // Particle class
-        class ParticleFlow {
-            constructor(x, y, colorRgb) {
+        class Particle {
+            constructor(x, y, color) {
                 this.x = x;
                 this.y = y;
                 this.originX = x;
                 this.originY = y;
-                this.color = colorRgb;
-                this.size = Math.random() * 2.4 + 1.2;
-                this.vx = (Math.random() - 0.5) * BASE_SPEED * 1.2;
-                this.vy = (Math.random() - 0.5) * BASE_SPEED * 1.2;
+                this.color = color;
+                this.size = Math.random() * 2 + 1;
+                this.vx = (Math.random() - 0.5) * SPEED_FACTOR;
+                this.vy = (Math.random() - 0.5) * SPEED_FACTOR;
                 this.angle = Math.random() * Math.PI * 2;
+                this.friction = 0.95;
             }
 
-            update(width, height) {
-                this.angle += 0.012;
-                const driftX = Math.sin(this.angle * 0.7) * 0.12;
-                const driftY = Math.cos(this.angle * 0.5) * 0.12;
-                
-                this.vx += driftX + (Math.random() - 0.5) * 0.08;
-                this.vy += driftY + (Math.random() - 0.5) * 0.08;
-                
-                this.vx *= 0.99;
-                this.vy *= 0.99;
-                
-                const maxSpeed = 2.2;
-                this.vx = Math.min(maxSpeed, Math.max(-maxSpeed, this.vx));
-                this.vy = Math.min(maxSpeed, Math.max(-maxSpeed, this.vy));
-                
+            update() {
+                // Gentle swirling motion
+                this.angle += 0.01;
+                this.vx += Math.cos(this.angle) * 0.05;
+                this.vy += Math.sin(this.angle) * 0.05;
+
                 this.x += this.vx;
                 this.y += this.vy;
-                
-                if (this.x < 0) this.x = width;
-                if (this.x > width) this.x = 0;
-                if (this.y < 0) this.y = height;
-                if (this.y > height) this.y = 0;
+
+                // Wrap around edges
+                if (this.x < 0) this.x = artCanvas.width;
+                if (this.x > artCanvas.width) this.x = 0;
+                if (this.y < 0) this.y = artCanvas.height;
+                if (this.y > artCanvas.height) this.y = 0;
             }
 
-            draw(ctx) {
+            draw() {
+                ctx.fillStyle = this.color;
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                ctx.fillStyle = this.color;
                 ctx.fill();
-                if(this.size > 1.8) {
-                    ctx.beginPath();
-                    ctx.arc(this.x-0.5, this.y-0.5, this.size*0.25, 0, Math.PI*2);
-                    ctx.fillStyle = 'rgba(255,255,200,0.25)';
-                    ctx.fill();
-                }
             }
         }
 
-        function generateParticlesFromFrame() {
-            const videoWidth = video.videoWidth;
-            const videoHeight = video.videoHeight;
-            
-            if (videoWidth === 0 || videoHeight === 0) {
-                console.warn("Video dimensions not ready");
-                return false;
-            }
-            
-            bufferCanvas.width = videoWidth;
-            bufferCanvas.height = videoHeight;
-            
-            bufferCtx.drawImage(video, 0, 0, videoWidth, videoHeight);
-            
-            let imageData;
-            try {
-                imageData = bufferCtx.getImageData(0, 0, videoWidth, videoHeight);
-            } catch(e) {
-                console.error("getImageData failed", e);
-                return false;
-            }
-            
-            const data = imageData.data;
-            const targetW = window.innerWidth;
-            const targetH = window.innerHeight;
-            artCanvas.width = targetW;
-            artCanvas.height = targetH;
-            
-            const scaleX = targetW / videoWidth;
-            const scaleY = targetH / videoHeight;
-            
-            const newParticles = [];
-            const step = PARTICLE_SAMPLE_STEP;
-            let particleCount = 0;
-            const maxParticlesLimit = 15000;
-            
-            for (let y = 0; y < videoHeight; y += step) {
-                for (let x = 0; x < videoWidth; x += step) {
-                    if (particleCount > maxParticlesLimit) break;
-                    const idx = (y * videoWidth + x) * 4;
-                    const r = data[idx];
-                    const g = data[idx+1];
-                    const b = data[idx+2];
-                    const a = data[idx+3];
-                    
-                    if (a > 40 && (r+g+b > 30)) {
-                        const alphaFactor = 0.85;
-                        const colorStr = `rgba(${r}, ${g}, ${b}, ${alphaFactor})`;
-                        const px = x * scaleX + (Math.random() * 1.5 - 0.75);
-                        const py = y * scaleY + (Math.random() * 1.5 - 0.75);
-                        newParticles.push(new ParticleFlow(px, py, colorStr));
-                        particleCount++;
-                    } else if ((r+g+b) > 20) {
-                        const colorStr = `rgba(${r}, ${g}, ${b}, 0.7)`;
-                        const px = x * scaleX;
-                        const py = y * scaleY;
-                        newParticles.push(new ParticleFlow(px, py, colorStr));
-                        particleCount++;
-                    }
-                }
-                if (particleCount > maxParticlesLimit) break;
-            }
-            
-            if (newParticles.length < 800) {
-                for (let i = 0; i < 600; i++) {
-                    const randX = Math.random() * targetW;
-                    const randY = Math.random() * targetH;
-                    const randCol = `rgba(180, 200, 255, 0.5)`;
-                    newParticles.push(new ParticleFlow(randX, randY, randCol));
-                }
-            }
-            
-            particles = newParticles;
-            return true;
-        }
-        
-        function startArtAnimation() {
-            if (animationFrameId) cancelAnimationFrame(animationFrameId);
-            
-            function drawFrame() {
-                if (!isArtModeActive) return;
-                
-                ctx.fillStyle = `rgba(0, 0, 0, ${TRAIL_FADE})`;
-                ctx.fillRect(0, 0, artCanvas.width, artCanvas.height);
-                
-                const currentW = artCanvas.width;
-                const currentH = artCanvas.height;
-                for (let p of particles) {
-                    p.update(currentW, currentH);
-                    p.draw(ctx);
-                }
-                
-                animationFrameId = requestAnimationFrame(drawFrame);
-            }
-            
-            drawFrame();
-        }
-        
-        async function onCaptureAndCreate() {
-            if (isArtModeActive || !cameraReady) {
-                if (!cameraReady) {
-                    statusDiv.innerText = "⚠️ Please enable camera first";
-                    setTimeout(() => {
-                        if(!isArtModeActive && cameraReady) statusDiv.innerText = "🎥 Ready · Point camera at any scene";
-                        else if(!isArtModeActive && !cameraReady) statusDiv.innerText = "📷 Tap 'Enable Camera' to start";
-                    }, 2000);
-                }
-                return;
-            }
-            
-            if (!video.videoWidth || !video.videoHeight) {
-                statusDiv.innerText = "⚠️ Camera not ready, try again";
-                return;
-            }
-            
-            loaderOverlay.classList.remove('hidden');
-            statusDiv.innerText = "🎨 Creating particle swarm...";
-            
-            await new Promise(r => setTimeout(r, 30));
-            
-            const success = generateParticlesFromFrame();
-            if (!success || particles.length === 0) {
-                loaderOverlay.classList.add('hidden');
-                statusDiv.innerText = "⚠️ Failed to generate art, try again";
-                setTimeout(() => {
-                    if(!isArtModeActive && cameraReady) statusDiv.innerText = "🎥 Ready · Point camera at any scene";
-                }, 1500);
-                return;
-            }
-            
-            isArtModeActive = true;
-            
-            video.style.opacity = '0';
-            video.style.visibility = 'hidden';
-            artCanvas.style.display = 'block';
-            artCanvas.style.visibility = 'visible';
-            artCanvas.style.opacity = '1';
-            
-            captureBtn.classList.add('hidden');
-            resetBtn.classList.remove('hidden');
-            
-            startArtAnimation();
-            
-            loaderOverlay.classList.add('hidden');
-            statusDiv.innerText = "🌀 Living Art · particles flowing";
-        }
-        
-        function resetToCamera() {
-            if (!isArtModeActive) return;
-            
-            if (animationFrameId) {
-                cancelAnimationFrame(animationFrameId);
-                animationFrameId = null;
-            }
-            
-            isArtModeActive = false;
-            particles = [];
-            
-            ctx.clearRect(0, 0, artCanvas.width, artCanvas.height);
-            
-            video.style.opacity = '1';
-            video.style.visibility = 'visible';
-            artCanvas.style.opacity = '0';
-            
-            captureBtn.classList.remove('hidden');
-            resetBtn.classList.add('hidden');
-            statusDiv.innerText = "🎥 Camera view · Press 'Capture & Morph'";
-        }
-        
         async function initCamera() {
-            if (cameraAttempted) return;
-            cameraAttempted = true;
-            
             try {
-                statusDiv.innerText = "📷 Accessing camera...";
-                
-                // Set a timeout to prevent infinite waiting
-                const cameraPromise = navigator.mediaDevices.getUserMedia({ 
-                    video: { 
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'environment',
                         width: { ideal: 1280 },
                         height: { ideal: 720 }
                     },
-                    audio: false 
+                    audio: false
                 });
-                
-                const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error("Camera request timeout")), 5000)
-                );
-                
-                const stream = await Promise.race([cameraPromise, timeoutPromise]);
-                
-                if (currentStream) {
-                    currentStream.getTracks().forEach(track => track.stop());
-                }
-                currentStream = stream;
                 video.srcObject = stream;
-                video.setAttribute('playsinline', '');
-                
-                await video.play();
-                
-                // Wait for video to have dimensions
-                await new Promise((resolve) => {
-                    if (video.videoWidth > 0) {
-                        resolve();
-                    } else {
-                        const checkInterval = setInterval(() => {
-                            if (video.videoWidth > 0) {
-                                clearInterval(checkInterval);
-                                resolve();
-                            }
-                        }, 50);
-                        setTimeout(() => {
-                            clearInterval(checkInterval);
-                            resolve();
-                        }, 2000);
-                    }
-                });
-                
-                cameraReady = true;
-                captureBtn.disabled = false;
-                captureBtn.style.opacity = '1';
-                statusDiv.innerText = "🎥 Ready! Point at something colorful";
-                
-                resizeCanvasToDisplay();
-                artCanvas.style.opacity = '0';
-                video.style.opacity = '1';
-                video.style.visibility = 'visible';
-                artCanvas.style.display = 'block';
-                
             } catch (err) {
-                console.error("Camera error:", err);
-                statusDiv.innerText = "❌ Camera access failed. Please check permissions.";
-                captureBtn.disabled = true;
-                cameraReady = false;
-                cameraAttempted = false;
-                
-                // Add retry button
-                const retryBtn = document.createElement('button');
-                retryBtn.textContent = '🔄 Retry Camera';
-                retryBtn.className = 'camera-trigger';
-                retryBtn.onclick = () => {
-                    retryBtn.remove();
-                    cameraAttempted = false;
-                    initCamera();
-                };
-                document.querySelector('.app-container').appendChild(retryBtn);
-                setTimeout(() => retryBtn.remove(), 5000);
+                console.error("Error accessing camera:", err);
+                statusText.innerText = "Camera access denied or not found.";
             }
         }
-        
-        function handleResize() {
-            if (isArtModeActive) {
-                const newWidth = window.innerWidth;
-                const newHeight = window.innerHeight;
-                if (artCanvas.width !== newWidth || artCanvas.height !== newHeight) {
-                    artCanvas.width = newWidth;
-                    artCanvas.height = newHeight;
+
+        function captureImage() {
+            isArtMode = true;
+            loader.style.display = 'block';
+            statusText.innerText = "Generating Art...";
+
+            // Match canvas sizes
+            artCanvas.width = window.innerWidth;
+            artCanvas.height = window.innerHeight;
+            bufferCanvas.width = video.videoWidth;
+            bufferCanvas.height = video.videoHeight;
+
+            // Draw video frame to buffer
+            bufferCtx.drawImage(video, 0, 0, bufferCanvas.width, bufferCanvas.height);
+            const imageData = bufferCtx.getImageData(0, 0, bufferCanvas.width, bufferCanvas.height);
+            const data = imageData.data;
+
+            // Initialize Particles
+            particles = [];
+            const scaleX = artCanvas.width / bufferCanvas.width;
+            const scaleY = artCanvas.height / bufferCanvas.height;
+
+            for (let y = 0; y < bufferCanvas.height; y += PARTICLE_DENSITY) {
+                for (let x = 0; x < bufferCanvas.width; x += PARTICLE_DENSITY) {
+                    const index = (y * bufferCanvas.width + x) * 4;
+                    const r = data[index];
+                    const g = data[index + 1];
+                    const b = data[index + 2];
+                    const a = data[index + 3];
+
+                    if (a > 128) {
+                        const color = `rgba(${r},${g},${b},${a/255})`;
+                        particles.push(new Particle(x * scaleX, y * scaleY, color));
+                    }
                 }
-            } else {
-                resizeCanvasToDisplay();
             }
+
+            // UI Changes
+            video.style.display = 'none';
+            artCanvas.style.display = 'block';
+            captureBtn.classList.add('hidden');
+            resetBtn.classList.remove('hidden');
+            loader.style.display = 'none';
+
+            animate();
         }
-        
-        // Create manual camera trigger button
-        const createCameraTrigger = () => {
-            const triggerBtn = document.createElement('button');
-            triggerBtn.textContent = '🎥 Enable Camera';
-            triggerBtn.className = 'camera-trigger';
-            triggerBtn.onclick = () => {
-                triggerBtn.remove();
-                initCamera();
-            };
-            document.querySelector('.app-container').appendChild(triggerBtn);
-            return triggerBtn;
-        };
-        
-        // Event binding
-        captureBtn.addEventListener('click', onCaptureAndCreate);
-        resetBtn.addEventListener('click', resetToCamera);
-        window.addEventListener('resize', () => setTimeout(handleResize, 50));
-        
-        // Setup initial state
-        artCanvas.style.opacity = '0';
-        video.style.display = 'block';
-        artCanvas.style.display = 'block';
-        artCanvas.style.backgroundColor = '#000';
-        
-        // Try to auto-start camera, but show manual button if it takes too long
-        const autoStartTimeout = setTimeout(() => {
-            if (!cameraReady && !cameraAttempted) {
-                statusDiv.innerText = "📱 Tap 'Enable Camera' to start";
-                createCameraTrigger();
-            }
-        }, 1000);
-        
-        // Auto attempt camera (works if page has permission or auto-grant)
-        initCamera().catch(() => {
-            clearTimeout(autoStartTimeout);
-            if (!cameraReady) {
-                createCameraTrigger();
+
+        function animate() {
+            if (!isArtMode) return;
+            
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.05)'; // Trail effect
+            ctx.fillRect(0, 0, artCanvas.width, artCanvas.height);
+
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+
+            animationId = requestAnimationFrame(animate);
+        }
+
+        function reset() {
+            isArtMode = false;
+            cancelAnimationFrame(animationId);
+            
+            video.style.display = 'block';
+            artCanvas.style.display = 'none';
+            captureBtn.classList.remove('hidden');
+            resetBtn.classList.add('hidden');
+            statusText.innerText = "Pointing to an image...";
+        }
+
+        captureBtn.addEventListener('click', captureImage);
+        resetBtn.addEventListener('click', reset);
+
+        // Initialize
+        initCamera();
+
+        // Handle resize
+        window.addEventListener('resize', () => {
+            if (isArtMode) {
+                artCanvas.width = window.innerWidth;
+                artCanvas.height = window.innerHeight;
             }
         });
-        
-        // Cleanup
-        window.addEventListener('beforeunload', () => {
-            if (currentStream) {
-                currentStream.getTracks().forEach(track => track.stop());
-            }
-            if (animationFrameId) cancelAnimationFrame(animationFrameId);
-        });
-    })();
-</script>
+    </script>
 </body>
 </html>
