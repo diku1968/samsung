@@ -1,73 +1,60 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
 
   <meta
     name="viewport"
     content="width=device-width, initial-scale=1.0, user-scalable=no"
-  />
+  >
 
-  <title>AR Video Tracker</title>
+  <title>AR Video</title>
 
-  <!-- AFRAME -->
-  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <!-- IMPORTANT VERSION -->
+  <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
 
-  <!-- MINDAR -->
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <!-- IMPORTANT VERSION -->
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-aframe.prod.js"></script>
 
   <style>
-    html,
-    body {
+    html, body {
       margin: 0;
-      padding: 0;
       width: 100%;
       height: 100%;
       overflow: hidden;
       background: black;
     }
 
-    body {
-      position: relative;
-    }
-
-    #loading {
+    #text {
       position: fixed;
-      z-index: 9999;
       top: 20px;
       width: 100%;
       text-align: center;
       color: white;
+      z-index: 9999;
       font-family: Arial;
-      font-size: 20px;
-    }
-
-    canvas {
-      position: fixed !important;
-      top: 0;
-      left: 0;
     }
   </style>
 </head>
 
 <body>
 
-<div id="loading">
-  Loading Camera...
+<div id="text">
+  Opening Camera...
 </div>
 
 <a-scene
-  mindar-image="imageTargetSrc: ./targets.mind; autoStart: true; uiScanning: true; uiLoading: true;"
-  embedded
+  mindar-image="imageTargetSrc: ./targets.mind;"
   color-space="sRGB"
-  renderer="physicallyCorrectLights: true; colorManagement: true"
+  renderer="colorManagement: true"
   vr-mode-ui="enabled: false"
   device-orientation-permission-ui="enabled: false"
 >
 
   <a-assets>
+
     <video
-      id="myvideo"
+      id="video"
       src="./video.mp4"
       preload="auto"
       loop
@@ -76,53 +63,55 @@
       webkit-playsinline
       crossorigin="anonymous"
     ></video>
+
   </a-assets>
 
-  <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+  <a-camera
+    position="0 0 0"
+    look-controls="enabled: false"
+  ></a-camera>
 
   <a-entity mindar-image-target="targetIndex: 0">
 
     <a-video
-      src="#myvideo"
+      src="#video"
       position="0 0 0"
       width="1"
       height="1.7"
-    >
-    </a-video>
+    ></a-video>
 
   </a-entity>
 
 </a-scene>
 
 <script>
-  const video = document.querySelector("#myvideo");
+  const video = document.querySelector("#video");
   const target = document.querySelector("[mindar-image-target]");
-  const loading = document.querySelector("#loading");
+  const text = document.querySelector("#text");
 
-  // Camera ready
-  document.querySelector("a-scene").addEventListener("loaded", () => {
-    loading.innerHTML = "Point Camera To Image";
-  });
-
-  // Target found
   target.addEventListener("targetFound", async () => {
-    console.log("FOUND");
 
-    loading.style.display = "none";
+    text.innerHTML = "Image Found";
 
     try {
       await video.play();
-    } catch (e) {
-      console.log(e);
+    } catch(err) {
+      console.log(err);
     }
+
   });
 
-  // Target lost
   target.addEventListener("targetLost", () => {
-    console.log("LOST");
+
+    text.innerHTML = "Point Camera To Image";
 
     video.pause();
+
   });
+
+  window.onload = () => {
+    text.innerHTML = "Point Camera To Image";
+  };
 </script>
 
 </body>
