@@ -1,54 +1,41 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>S26 Ultra AR Player</title>
-    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-    <style>
-        body { margin: 0; overflow: hidden; }
-        #info {
-            position: absolute; top: 10px; left: 10px; z-index: 100;
-            color: white; font-family: sans-serif; background: rgba(0,0,0,0.6);
-            padding: 10px; border-radius: 8px; pointer-events: none;
-        }
-    </style>
-</head>
-<body>
+  <head>
+    <title>AR Visiting Card Test</title>
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+  </head>
 
-    <div id="info">Scanning for your image target...</div>
+  <body style="margin: 0px; overflow: hidden;">
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix;">
+      
+      <a-assets>
+        <!-- Test ke liye koi bhi mp4 video link yahan dalein -->
+        <video id="testVideo" src="pvideo.mp4" 
+               preload="auto" loop="true" crossorigin="anonymous" 
+               playsinline webkit-playsinline>
+        </video>
+      </a-assets>
 
-    <a-scene mindar-image="imageTargetSrc: ./targets.mind;" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
-        <a-assets>
-            <!-- IMPORTANT: Change 'video.mp4' to your video file name -->
-            <video id="vid" src="./video.mp4" loop="true" crossorigin="anonymous" playsinline webkit-playsinline></video>
-        </a-assets>
+      <!-- Aapki .patt file yahan connect hogi -->
+      <a-marker type="pattern" url="pattern-marker (1).patt">
+        <!-- Line 22 ko isse badal dein -->
+<a-video src="#testVideo" 
+         width="1.5" height="1" 
+         position="0 0.1 0" 
+         rotation="-90 0 0"
+         play-on-click> <!-- Yeh attribute add karein -->
+</a-video>
+</a-video>
+      </a-marker>
 
-        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-
-        <a-entity id="target" mindar-image-target="targetIndex: 0">
-            <a-video src="#vid" width="1" height="0.6" position="0 0 0" rotation="0 0 0"></a-video>
-        </a-entity>
+      <a-entity camera></a-entity>
     </a-scene>
 
     <script>
-        const targetEl = document.querySelector('#target');
-        const videoEl = document.querySelector('#vid');
-        const infoEl = document.querySelector('#info');
-
-        targetEl.addEventListener("targetFound", () => {
-            infoEl.innerText = "Target Found - Playing";
-            videoEl.play();
-        });
-
-        targetEl.addEventListener("targetLost", () => {
-            infoEl.innerText = "Scanning for image...";
-            videoEl.pause();
-        });
-
-        window.addEventListener('click', () => {
-            videoEl.muted = false;
-        });
+      window.addEventListener('click', function () {
+        document.querySelector('#testVideo').play();
+      });
     </script>
-</body>
+  </body>
 </html>
