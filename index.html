@@ -75,6 +75,7 @@
             background-color: #ff3366;
             box-shadow: 0 0 10px rgba(255,51,102,0.6);
             cursor: pointer;
+            display: block; /* Start visible since Bentonite loads first */
             transition: transform 0.3s ease;
         }
         .hotspot:hover {
@@ -164,9 +165,12 @@
         alt="Bentonite Structure Model" 
         shadow-intensity="1"
         auto-rotate
-        rotation-per-second="30deg">
+        rotation-per-second="30deg"
+        autoplay>
 
-        
+        <button class="hotspot" id="silicon-hotspot" slot="hotspot-silica" data-position="0m 1m 0m" data-normal="0m 1m 0m">
+            <div class="hotspot-annotation">Silicon (Si)</div>
+        </button>
 
         <button slot="ar-button" class="ar-trigger-style">
             📱 View in AR Camera
@@ -199,74 +203,79 @@
         const btnTinto = document.getElementById('btn-tinto');
         const btnOilbath = document.getElementById('btn-oilbath');
         
+        // Helper function to reset active status classes from all menu items
+        function resetActiveButtons() {
+            btnBentonite.classList.remove('active');
+            btnChairman.classList.remove('active');
+            btnTinto.classList.remove('active');
+            btnOilbath.classList.remove('active');
+            detailPanel.classList.remove('show-panel');
+        }
 
-        // Logic for Switching to the Bentonite Model View
+        // 1. Logic for Switching to the Bentonite Model View
         btnBentonite.addEventListener('click', () => {
+            resetActiveButtons();
+            btnBentonite.classList.add('active');
+            
             viewer.src = "Bentonite.glb";
             viewer.alt = "A 3D model of Bentonite Structure";
-            viewer.setAttribute('auto-rotate', ''); // Turn rotation back on
+            viewer.setAttribute('auto-rotate', ''); 
             
-            // Show molecule hotspots
             siliconHotspot.style.display = "block";
-            
-            // UI Button Active State Styles Switching
-            btnChairman.classList.remove('active');
-            btnBentonite.classList.add('active');
-            detailPanel.classList.remove('show-panel');
         });
 
-        // Logic for Switching to the Chairman Model View
+        // 2. Logic for Switching to the Pilot Project View
         btnChairman.addEventListener('click', () => {
+            resetActiveButtons();
+            btnChairman.classList.add('active');
+            
             viewer.src = "pilotproject.glb";
             viewer.alt = "Pilot Project";
-            viewer.removeAttribute('auto-rotate'); // Hold character stable during speech presentation
+            viewer.removeAttribute('auto-rotate'); 
             
-            // Hide molecular hotspots from showing on the person
             siliconHotspot.style.display = "none";
-            
-            // UI Button Active State Styles Switching
-            btnBentonite.classList.remove('active');
-            btnChairman.classList.add('active');
-            detailPanel.classList.remove('show-panel');
         });
+
+        // 3. Logic for Switching to the Tinto Meter View
         btnTinto.addEventListener('click', () => {
+            resetActiveButtons();
+            btnTinto.classList.add('active');
+            
             viewer.src = "tinto.glb";
             viewer.alt = "Tinto Project";
-            viewer.removeAttribute('auto-rotate'); // Hold character stable during speech presentation
+            viewer.removeAttribute('auto-rotate'); 
             
-            // Hide molecular hotspots from showing on the person
             siliconHotspot.style.display = "none";
-            
-            // UI Button Active State Styles Switching
-            btnBentonite.classList.remove('active');
-            btnTinto.classList.add('active');
-            detailPanel.classList.remove('show-panel');
         });
+
+        // 4. Logic for Switching to the Oil Bath (Animated) View
         btnOilbath.addEventListener('click', () => {
+            resetActiveButtons();
+            btnOilbath.classList.add('active');
+            
             viewer.src = "oilbath.glb";
             viewer.alt = "Oil Bath Project";
-            viewer.removeAttribute('auto-rotate'); // Hold character stable during speech presentation
+            viewer.removeAttribute('auto-rotate'); 
             
-            // Hide molecular hotspots from showing on the person
             siliconHotspot.style.display = "none";
-            
-            // UI Button Active State Styles Switching
-            btnBentonite.classList.remove('active');
-            btnOilbath.classList.add('active');
-            detailPanel.classList.remove('show-panel');
-        });
-        
-        
 
-        // Click Event Callback Triggered on Silicon Node Hit
-        // siliconHotspot.addEventListener('click', () => {
-        //     panelTitle.innerText = "Silicon Tetrahedral Matrix (Si)";
-        //     panelDesc.innerHTML = `
-        //         <strong>Role in Bentonite:</strong> Formulates sturdy external $SiO_4$ tetrahedral crystal barriers protecting the central layer.<br><br>
-        //         <strong>Acid Activation:</strong> Highly resistant to hydrogen leaching. When mineral lattice impurities dissolve to open porous bleaching channels, this framework ensures structural stability remains intact.
-        //     `;
-        //     detailPanel.classList.add('show-panel');
-        // });
+            // CRITICAL FIX: Explicitly forces the engine to parse and execute the animation timeline
+            viewer.addEventListener('load', () => {
+                if (viewer.src.includes("oilbath.glb")) {
+                    viewer.play(); 
+                }
+            }, { once: true });
+        });
+
+        // Interactive callback context for the Hotspot click 
+        siliconHotspot.addEventListener('click', () => {
+            panelTitle.innerText = "Silicon Tetrahedral Matrix (Si)";
+            panelDesc.innerHTML = `
+                <strong>Role in Bentonite:</strong> Formulates sturdy external barriers protecting the central layer.<br><br>
+                <strong>Acid Activation:</strong> Highly resistant to hydrogen leaching. When mineral lattice impurities dissolve to open porous bleaching channels, this framework ensures structural stability remains intact.
+            `;
+            detailPanel.classList.add('show-panel');
+        });
 
         // Information Card System Close Routine
         closeBtn.addEventListener('click', () => {
