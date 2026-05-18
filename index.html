@@ -3,45 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bentonite Molecule</title>
-    <!-- Import the <model-viewer> component -->
+    <title>Corporate 3D & AR Portal</title>
+    
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
+    
     <style>
-        body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f0f0f0; }
-        model-viewer { width: 100%; height: 100%; }
-    </style>
-</head>
-<body>
+        /* Base Page Setup */
+        body { 
+            margin: 0; 
+            padding: 0; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            background: radial-gradient(circle, #f7f9fb 0%, #e2e8f0 100%);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            overflow: hidden;
+        }
 
-    <model-viewer 
-        src="Bentonite.glb" 
-        ar 
-        ar-modes="webxr scene-viewer quick-look" 
-        camera-controls 
-        touch-action="pan-y" 
-        alt="A 3D model of Bentonite Structure" 
-        shadow-intensity="1"
-        auto-rotate
-        rotatation-per-second="30deg"
-        >
+        /* 3D Canvas Viewport */
+        model-viewer { 
+            width: 100%; 
+            height: 100%; 
+            --poster-color: transparent;
+        }
 
-        
+        /* Navigation Menu Container */
+        .menu-container {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            padding: 10px 20px;
+            border-radius: 50px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+            z-index: 10;
+        }
 
-        <button slot="ar-button" style="background-color: white; border-radius: 4px; border: none; position: absolute; top: 16px; right: 16px; padding: 10px 20px;">
-            👋 View in AR
-        </button>
-    </model-viewer>
+        /* Menu Navigation Buttons */
+        .menu-btn {
+            background-color: transparent;
+            color: #4a5568;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 40px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .menu-btn:hover {
+            color: #1a0dab;
+            background: rgba(0, 0, 0, 0.04);
+        }
+        .menu-btn.active { 
+            background-color: #1a0dab; 
+            color: white;
+            box-shadow: 0 4px 12px rgba(26, 13, 171, 0.25);
+        }
 
-    <style>
+        /* Molecule Hotspot Styling */
         .hotspot {
-            width: 20px;
-            height: 20px;
-            border-radius: 10px;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
             border: none;
             background-color: #ff3366;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+            box-shadow: 0 0 10px rgba(255,51,102,0.6);
             cursor: pointer;
-            transition: transform 0.3s;
+            transition: transform 0.3s ease;
+        }
+        .hotspot:hover {
+            transform: scale(1.3);
         }
         .hotspot:not([data-visible]) {
             background-color: transparent;
@@ -51,23 +88,160 @@
         }
         .hotspot-annotation {
             background: #ffffff;
-            border-radius: 4px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.25);
-            color: rgba(0, 0, 0, 0.8);
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            color: #1a202c;
             display: block;
-            font-family: sans-serif;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 700;
             left: calc(100% + 1em);
-            max-width: 200px;
-            padding: 0.5em 1em;
+            padding: 6px 12px;
             position: absolute;
             top: 50%;
             transform: translateY(-50%);
             width: max-content;
             pointer-events: none;
         }
+
+        /* Slide-up Dynamic Information Panel */
+        #detail-panel {
+            position: absolute;
+            bottom: 110px;
+            left: 50%;
+            transform: translateX(-50%) translateY(150%);
+            width: 90%;
+            max-width: 420px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(16px);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.12);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1);
+            z-index: 9;
+        }
+        #detail-panel.show-panel {
+            transform: translateX(-50%) translateY(0);
+        }
+        #close-btn {
+            position: absolute;
+            top: 14px;
+            right: 18px;
+            background: none;
+            border: none;
+            font-size: 22px;
+            cursor: pointer;
+            color: #a0aec0;
+        }
+        #close-btn:hover { color: #4a5568; }
+        #panel-title { margin: 0 0 8px 0; color: #1a0dab; font-size: 18px; font-weight: 700; }
+        #panel-desc { margin: 0; font-size: 14px; line-height: 1.6; color: #4a5568; }
+
+        /* Custom Native AR Trigger Button Alignment */
+        .ar-trigger-style {
+            background-color: #ffffff; 
+            color: #1a202c;
+            font-weight: 600;
+            border-radius: 30px; 
+            border: none; 
+            position: absolute; 
+            top: 20px; 
+            right: 20px; 
+            padding: 12px 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            cursor: pointer;
+        }
     </style>
+</head>
+<body>
+
+    <model-viewer 
+        id="app-viewer"
+        src="Bentonite.glb" 
+        ar 
+        ar-modes="webxr scene-viewer quick-look" 
+        camera-controls 
+        touch-action="pan-y" 
+        alt="Bentonite Structure Model" 
+        shadow-intensity="1"
+        auto-rotate
+        rotation-per-second="30deg">
+
+        <button class="hotspot" id="silicon-hotspot" slot="hotspot-silica" data-position="0m 1m 0m" data-normal="0m 1m 0m">
+            <div class="hotspot-annotation">Silicon (Si)</div>
+        </button>
+
+        <button slot="ar-button" class="ar-trigger-style">
+            📱 View in AR Camera
+        </button>
+    </model-viewer>
+
+    <div id="detail-panel">
+        <button id="close-btn">&times;</button>
+        <h3 id="panel-title">Element Details</h3>
+        <p id="panel-desc">Click on an active element hotspot to reveal structural properties during industrial bleaching activation.</p>
+    </div>
+
+    <div class="menu-container">
+        <button class="menu-btn active" id="btn-bentonite">🔬 Bentonite Sheet</button>
+        <button class="menu-btn" id="btn-chairman">👔 Chairman Speech</button>
+    </div>
+
+    <script>
+        const viewer = document.getElementById('app-viewer');
+        const detailPanel = document.getElementById('detail-panel');
+        const panelTitle = document.getElementById('panel-title');
+        const panelDesc = document.getElementById('panel-desc');
+        const closeBtn = document.getElementById('close-btn');
+        
+        const siliconHotspot = document.getElementById('silicon-hotspot');
+        const btnBentonite = document.getElementById('btn-bentonite');
+        const btnChairman = document.getElementById('btn-chairman');
+
+        // Logic for Switching to the Bentonite Model View
+        btnBentonite.addEventListener('click', () => {
+            viewer.src = "Bentonite.glb";
+            viewer.alt = "A 3D model of Bentonite Structure";
+            viewer.setAttribute('auto-rotate', ''); // Turn rotation back on
+            
+            // Show molecule hotspots
+            siliconHotspot.style.display = "block";
+            
+            // UI Button Active State Styles Switching
+            btnChairman.classList.remove('active');
+            btnBentonite.classList.add('active');
+            detailPanel.classList.remove('show-panel');
+        });
+
+        // Logic for Switching to the Chairman Model View
+        btnChairman.addEventListener('click', () => {
+            viewer.src = "pilotproject.glb";
+            viewer.alt = "Pilot Project";
+            viewer.removeAttribute('auto-rotate'); // Hold character stable during speech presentation
+            
+            // Hide molecular hotspots from showing on the person
+            siliconHotspot.style.display = "none";
+            
+            // UI Button Active State Styles Switching
+            btnBentonite.classList.remove('active');
+            btnChairman.classList.add('active');
+            detailPanel.classList.remove('show-panel');
+        });
+
+        // Click Event Callback Triggered on Silicon Node Hit
+        // siliconHotspot.addEventListener('click', () => {
+        //     panelTitle.innerText = "Silicon Tetrahedral Matrix (Si)";
+        //     panelDesc.innerHTML = `
+        //         <strong>Role in Bentonite:</strong> Formulates sturdy external $SiO_4$ tetrahedral crystal barriers protecting the central layer.<br><br>
+        //         <strong>Acid Activation:</strong> Highly resistant to hydrogen leaching. When mineral lattice impurities dissolve to open porous bleaching channels, this framework ensures structural stability remains intact.
+        //     `;
+        //     detailPanel.classList.add('show-panel');
+        // });
+
+        // Information Card System Close Routine
+        closeBtn.addEventListener('click', () => {
+            detailPanel.classList.remove('show-panel');
+        });
+    </script>
 
 </body>
 </html>
