@@ -166,9 +166,7 @@
         auto-rotate
         rotation-per-second="30deg">
 
-        <button class="hotspot" id="silicon-hotspot" slot="hotspot-silica" data-position="0m 1m 0m" data-normal="0m 1m 0m">
-            <div class="hotspot-annotation">Silicon (Si)</div>
-        </button>
+        
 
         <button slot="ar-button" class="ar-trigger-style">
             📱 View in AR Camera
@@ -184,6 +182,8 @@
     <div class="menu-container">
         <button class="menu-btn active" id="btn-bentonite">🔬 Bentonite Molecule</button>
         <button class="menu-btn" id="btn-chairman">👔 Pilot Project</button>
+        <button class="menu-btn" id="btn-tinto">📊 Tinto Meter</button>
+        <button class="menu-btn" id="btn-oilbath">📈 Oil Bath</button>
     </div>
 
     <script>
@@ -196,6 +196,9 @@
         const siliconHotspot = document.getElementById('silicon-hotspot');
         const btnBentonite = document.getElementById('btn-bentonite');
         const btnChairman = document.getElementById('btn-chairman');
+        const btnTinto = document.getElementById('btn-tinto');
+        const btnOilbath = document.getElementById('btn-oilbath');
+        
 
         // Logic for Switching to the Bentonite Model View
         btnBentonite.addEventListener('click', () => {
@@ -226,6 +229,34 @@
             btnChairman.classList.add('active');
             detailPanel.classList.remove('show-panel');
         });
+        btnTinto.addEventListener('click', () => {
+            viewer.src = "tinto.glb";
+            viewer.alt = "Tinto Project";
+            viewer.removeAttribute('auto-rotate'); // Hold character stable during speech presentation
+            
+            // Hide molecular hotspots from showing on the person
+            siliconHotspot.style.display = "none";
+            
+            // UI Button Active State Styles Switching
+            btnBentonite.classList.remove('active');
+            btnTinto.classList.add('active');
+            detailPanel.classList.remove('show-panel');
+        });
+        btnOilbath.addEventListener('click', () => {
+            viewer.src = "oilbath.glb";
+            viewer.alt = "Oil Bath Project";
+            viewer.removeAttribute('auto-rotate'); // Hold character stable during speech presentation
+            
+            // Hide molecular hotspots from showing on the person
+            siliconHotspot.style.display = "none";
+            
+            // UI Button Active State Styles Switching
+            btnBentonite.classList.remove('active');
+            btnOilbath.classList.add('active');
+            detailPanel.classList.remove('show-panel');
+        });
+        
+        
 
         // Click Event Callback Triggered on Silicon Node Hit
         // siliconHotspot.addEventListener('click', () => {
