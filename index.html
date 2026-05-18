@@ -13,19 +13,67 @@
 </head>
 <body>
 
-    <!-- The 3D Viewer with AR enabled -->
     <model-viewer 
         src="Bentonite.glb" 
         ar 
         ar-modes="webxr scene-viewer quick-look" 
         camera-controls 
         touch-action="pan-y" 
-        alt="A 3D model of something awesome" 
-        shadow-intensity="1">
+        alt="A 3D model of Bentonite Structure" 
+        shadow-intensity="1"
+        auto-rotate
+        rotatation-per-second="30deg"
+        >
+
+        <button class="hotspot" slot="hotspot-silica" data-position="0m 1m 0m" data-normal="0m 1m 0m">
+            <div class="hotspot-annotation">Silica Tetrahedral Sheet (Blue Nodes)</div>
+        </button>
+
+        <button class="hotspot" slot="hotspot-cations" data-position="0m 0m 0.5m" data-normal="0m 0m 1m">
+            <div class="hotspot-annotation">Interlayer Cations (Na+, Ca2+) - Removed by Acid</div>
+        </button>
+
         <button slot="ar-button" style="background-color: white; border-radius: 4px; border: none; position: absolute; top: 16px; right: 16px; padding: 10px 20px;">
             👋 View in AR
         </button>
     </model-viewer>
+
+    <style>
+        .hotspot {
+            width: 20px;
+            height: 20px;
+            border-radius: 10px;
+            border: none;
+            background-color: #ff3366;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+        .hotspot:not([data-visible]) {
+            background-color: transparent;
+            border: 3px solid #ffffff;
+            box-shadow: none;
+            pointer-events: none;
+        }
+        .hotspot-annotation {
+            background: #ffffff;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+            color: rgba(0, 0, 0, 0.8);
+            display: block;
+            font-family: sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            left: calc(100% + 1em);
+            max-width: 200px;
+            padding: 0.5em 1em;
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: max-content;
+            pointer-events: none;
+        }
+    </style>
 
 </body>
 </html>
